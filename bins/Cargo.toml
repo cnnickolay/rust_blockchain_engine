@@ -1,0 +1,15 @@
+[package]
+name = "bins"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = "*"
+protocol = {path="../protocol", version = "*"}
+serde_cbor = "*"
+anyhow = "*"
+uuid = {version = "*", features = ["v4"]}
+engine = {path = "../engine"}
+clap = {version = "*", features = ["derive"]}
