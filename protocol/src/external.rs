@@ -8,14 +8,25 @@ pub struct ExternalRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum UserCommand {
+    PingCommand {
+        msg: String
+    },
     CreateRecord {
         data: String
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum UserCommandResponse {
+    PingCommandResponse {
+        request_id: String,
+        msg: String
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ExternalResponse {
-    Success(),
+    Success(UserCommandResponse),
     Error {
         msg: String
     }

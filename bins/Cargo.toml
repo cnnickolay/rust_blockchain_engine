@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = "*"
+serde = "1.0.151"
 protocol = {path="../protocol", version = "*"}
-serde_cbor = "*"
-anyhow = "*"
-uuid = {version = "*", features = ["v4"]}
+serde_cbor = "0.11.2"
+anyhow = "1.0.68"
+uuid = {version = "1.2.2", features = ["v4"]}
 engine = {path = "../engine"}
-clap = {version = "*", features = ["derive"]}
+clap = {version = "4.0.29", features = ["derive"]}
