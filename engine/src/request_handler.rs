@@ -16,14 +16,14 @@ impl RequestHandler<InternalResponse> for InternalRequest {
 impl RequestHandler<ExternalResponse> for ExternalRequest {
     type RESPONSE = ExternalResponse;
     fn handle_request(&self) -> Self::RESPONSE {
-        dbg!("External request received");
+        println!("External request received");
         match &self.command {
             UserCommand::CreateRecord { data } => panic!("Not ready yet"),
             UserCommand::PingCommand { msg } => {
-                dbg!("Received ping command");
+                println!("Received ping command");
                 ExternalResponse::Success(UserCommandResponse::PingCommandResponse { 
                     request_id: self.request_id.clone(), 
-                    msg: format!("Original message: {}, PONG PONG", msg) 
+                    msg: format!("Original message: {}, PONG PONG", msg)
                 })
             },
         }

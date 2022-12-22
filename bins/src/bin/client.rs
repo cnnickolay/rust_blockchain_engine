@@ -1,8 +1,5 @@
-use std::{net::TcpStream, io::{Write}};
-use protocol::{external::{ExternalRequest, UserCommand}, request::Request, response::Response};
+use engine::client::{Client};
 use anyhow::Result;
-
-use uuid::Uuid;
 use clap::{Parser, ValueEnum};
 
 fn main() {
@@ -14,33 +11,15 @@ fn main() {
 }
 
 fn client(args: &Args) -> Result<()> {
-    let request_id = Uuid::new_v4().to_string();
-    let user_command = match args.command { 
-        ArgsCommand::CreateRecord => UserCommand::CreateRecord { data: args.value.clone() },
-        ArgsCommand::Ping => UserCommand::PingCommand { msg: "This is my PING PING PING PING".to_string() }
-    };
+    // let request = match args.command { 
+    //     ArgsCommand::CreateRecord => UserCommand::CreateRecord { data: args.value.clone() }.to_request(),
+    //     ArgsCommand::Ping => UserCommand::generate_ping("ping").to_request()
+    // };
 
-    let request = ExternalRequest { 
-        request_id, 
-        command: user_command, 
-    };
-    send_bytes(&args.destination, Request::External(request))?;
-    Ok(())
-}
-
-fn send_bytes(destination: &str, msg: Request) -> Result<()> {
-    let mut stream = TcpStream::connect(destination)?;
-
-    let bytes = serde_cbor::to_vec(&msg)?;
-    println!("Sending bytes: {:?}", bytes);
-    let len: [u8; 8] = bytes.len().to_be_bytes();
-    println!("Sending total {} bytes", bytes.len());
-    stream.write(&len)?;
-    stream.write(&bytes)?;
-
-    let response: Response = serde_cbor::from_reader(&stream)?;
-    println!("Response: {:?}", response);
-
+    let client = Client::new(&args.destination);
+    println!("Received {:?}", client.ping("123")?);
+    println!("Received {:?}", client.ping("iiii")?);
+    println!("Received {:?}", client.ping("4564095")?);
     Ok(())
 }
 
