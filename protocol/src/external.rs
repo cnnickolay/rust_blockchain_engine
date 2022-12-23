@@ -31,7 +31,7 @@ pub enum UserCommand {
 }
 
 impl UserCommand {
-    pub fn generate_ping(msg: &str) -> UserCommand {
+    pub fn new_ping(msg: &str) -> UserCommand {
         UserCommand::PingCommand { msg: msg.to_string() }
     }
 

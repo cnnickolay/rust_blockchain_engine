@@ -7,17 +7,15 @@ pub fn run_coordinator_node(host: String, port: u16) -> Result<()> {
     let listener = TcpListener::bind(format!("{}:{}", host, port))?;
     println!("Coordinator node is running on {}:{}", host, port);
 
-    let state = State::new();
-    let configuration = Configuration::new(&host, port, NodeType::new_coordinator());
+    let mut state = State::new();
+    let mut configuration = Configuration::new(&host, port, NodeType::new_coordinator());
 
     loop {
         let (mut stream, addr) = listener.accept()?;
         println!("New connection opened");
     
         let request = receive_and_parse(&mut stream)?;
-        handle_request(&request, &mut stream)?;
-
-        // println!("Blockchain elements: {:?}", state.block_chain);
+        handle_request(&request, &mut stream, &mut configuration, &mut state)?;
     }
 }
 
@@ -26,6 +24,7 @@ pub fn run_validator_node(host: String, port: u16, coordinator_ip: &str) -> Resu
     println!("Validator node is running on {}:{}", host, port);
 
     let client = Client::new(coordinator_ip);
+    client.register_validator(&host, port)?;
 
     loop {
         let (mut stream, addr) = listener.accept()?;
@@ -50,15 +49,14 @@ fn receive_and_parse(stream: &mut TcpStream) -> Result<Request> {
 /**
  * Handles the request and sends response to the socket
  */
-pub fn handle_request(request: &Request, stream: &mut TcpStream) -> Result<()> {
+pub fn handle_request(request: &Request, stream: &mut TcpStream, configuration: &mut Configuration, state: &mut State) -> Result<()> {
     println!("Received request: {:?}", request);
     let response = match request {
-        Request::Internal(req) => Response::Internal(req.handle_request()),
-        Request::External(req) => Response::External(req.handle_request()),
+        Request::Internal(req) => Response::Internal(req.handle_request(configuration, state)),
+        Request::External(req) => Response::External(req.handle_request(configuration, state)),
     };
 
     let bytes = serde_cbor::to_vec(&response)?;
-    println!("Sending response {} bytes", bytes.len());
     stream.write(&bytes)?;
     Ok(())
 }

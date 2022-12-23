@@ -1,7 +1,7 @@
 use std::{net::TcpStream, io::Write};
 
 use anyhow::Result;
-use protocol::{request::Request, response::Response, external::UserCommand};
+use protocol::{request::Request, response::Response, external::UserCommand, internal};
 
 pub struct Client {
     destination: String,
@@ -13,11 +13,11 @@ impl Client {
     }
 
     pub fn ping(&self, msg: &str) -> Result<Response> {
-        send_bytes(&self.destination, UserCommand::generate_ping(msg).to_request())
+        send_bytes(&self.destination, UserCommand::new_ping(msg).to_request())
     }
 
     pub fn register_validator(&self, ip: &str, port: u16) -> Result<Response> {
-        todo!()
+        send_bytes(&self.destination, internal::CommandRequest::new_on_board_command(&format!("{}:{}", ip, port)).to_request())
     }
 }
 

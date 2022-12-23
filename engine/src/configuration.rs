@@ -3,9 +3,9 @@
  * A runtime configuration for current node
  */
 pub struct Configuration {
-    ip: String,
-    port: u16,
-    node_type: NodeType,
+    pub ip: String,
+    pub port: u16,
+    pub node_type: NodeType,
 }
 
 impl Configuration {
@@ -31,7 +31,8 @@ pub enum NodeType {
     Validator
 }
 
-pub struct ValidatorAddress(String);
+#[derive(Debug, Clone)]
+pub struct ValidatorAddress(pub String);
 
 impl NodeType {
     pub fn new_coordinator() -> Self {

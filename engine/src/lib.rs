@@ -9,4 +9,5 @@ pub mod client;
 pub mod configuration;
 pub mod wallet;
 
-pub use engine::run_coordinator_node as program;
+pub use engine::run_coordinator_node as coordinator_program;
+pub use engine::run_validator_node as validator_program;

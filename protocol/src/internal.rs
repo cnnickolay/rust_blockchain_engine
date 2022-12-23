@@ -1,34 +1,53 @@
 use serde::{Serialize, Deserialize};
+use uuid::Uuid;
+
+use crate::request::Request;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum InternalRequest {
-    RegisterValidator {
-        request_id: String,
-        destination: String // e.g. 127.0.0.1:8080
-    }
+pub struct InternalRequest {
+    pub request_id: String,
+    pub command: CommandRequest
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum InternalResponse {
-    RegisterValidator {
-        request_id: String
+    Success(CommandResponse),
+    Error {
+        msg: String
     }
 }
 
-//
+#[derive(Serialize, Deserialize, Debug)]
+pub enum CommandRequest {
+    OnBoardValidator {
+        return_address: String
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum CommandResponse {
+    OnBoardValidatorResponse
+}
+
+
+// ################
+
+impl CommandRequest {
+    pub fn new_on_board_command(return_address: &str) -> CommandRequest {
+        CommandRequest::OnBoardValidator { return_address: return_address.to_string() }
+    }
+
+    pub fn to_request(self) -> Request {
+        Request::Internal(InternalRequest::new(self))
+    }
+}
 
 impl InternalRequest {
-    pub fn hash(&self) -> &String {
-        match self {
-            InternalRequest::RegisterValidator { request_id: hash, .. } => hash,
-        }
-    }
-}
-
-impl InternalResponse {
-    pub fn hash(&self) -> &String {
-        match self {
-            InternalResponse::RegisterValidator { request_id: hash, .. } => hash,
+    pub fn new(command: CommandRequest) -> Self {
+        let request_id = Uuid::new_v4().to_string();
+        InternalRequest {
+            request_id,
+            command
         }
     }
 }
