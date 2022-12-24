@@ -15,7 +15,7 @@ impl RequestHandler<InternalResponse> for InternalRequest {
             protocol::internal::CommandRequest::OnBoardValidator { return_address } => {
                 match configuration.node_type {
                     NodeType::Coordinator { ref mut validators } => {
-                        let validator_address = ValidatorAddress("123".to_string());
+                        let validator_address = ValidatorAddress(return_address.to_owned());
                         validators.push(validator_address);
                         println!("Added new validator {:?}, total validators {}", return_address, &validators.len());
                     },
