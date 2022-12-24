@@ -1,7 +1,7 @@
 pub struct Transaction {
     pub from_address: PublicKey,
     pub to_address: PublicKey,
-    pub amount: f64,
+    pub amount: u64,
     pub signature: Signature
 }
 
