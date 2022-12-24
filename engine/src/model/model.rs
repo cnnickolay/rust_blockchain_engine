@@ -1,18 +1,14 @@
-use protocol::external::UserCommand;
-
-
-/**
- * Block represents a single element in the blockchain
- */
-#[derive(Debug)]
-pub struct Block {
-    pub user_command: UserCommand
+pub struct Transaction {
+    pub from_address: PublicKey,
+    pub to_address: PublicKey,
+    pub amount: f64,
+    pub signature: Signature
 }
 
-/**
- * Holds an internal state of the current node
- */
-#[derive(Debug)]
- pub struct State {
-    pub block_chain: Vec<Block>
+pub struct BlockChain {
+    pub transactions: Vec<Transaction>,
 }
+
+pub struct Signature(pub String);
+
+pub struct PublicKey(pub String);

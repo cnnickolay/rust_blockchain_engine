@@ -1,4 +1,4 @@
-use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
+use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme, pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey}, pkcs8::LineEnding};
 use sha1::{Sha1, Digest};
 
 
@@ -15,6 +15,15 @@ pub fn encrypt() {
     let signature = priv_key.sign(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest).unwrap();
     let result = pub_key.verify(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest, &signature).unwrap();
 
+    // let pem = pub_key.to_pkcs1_pem(LineEnding::LF).unwrap();
+    let pem = hex::encode(pub_key.to_pkcs1_der().unwrap());
+    // let pem = String::from_utf8(pub_key.to_pkcs1_der().unwrap().as_bytes().to_vec()).unwrap();
+    println!("pem: {}", pem);
+    println!("signature: {}", hex::encode(&signature));
+
+    // let pub_key_restored = RsaPublicKey::from_pkcs1_pem(&pem).unwrap();
+    let pub_key_restored = RsaPublicKey::from_pkcs1_der(&hex::decode(pem).unwrap()).unwrap();
+    let result = pub_key_restored.verify(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest, &signature).unwrap();
 
     // println!("encrypting");
     // // Encrypt

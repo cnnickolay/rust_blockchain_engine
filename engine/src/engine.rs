@@ -1,13 +1,12 @@
 use std::{net::{TcpListener, TcpStream}, io::{Write, Read}};
 use anyhow::Result;
 use protocol::{request::Request, response::Response};
-use crate::{model::{State}, request_handler::RequestHandler, configuration::{Configuration, NodeType}, client::Client};
+use crate::{request_handler::RequestHandler, configuration::{Configuration, NodeType}, client::Client};
 
 pub fn run_coordinator_node(host: String, port: u16) -> Result<()> {
     let listener = TcpListener::bind(format!("{}:{}", host, port))?;
     println!("Coordinator node is running on {}:{}", host, port);
 
-    let mut state = State::new();
     let mut configuration = Configuration::new(&host, port, NodeType::new_coordinator());
 
     loop {
@@ -15,7 +14,7 @@ pub fn run_coordinator_node(host: String, port: u16) -> Result<()> {
         println!("New connection opened");
     
         let request = receive_and_parse(&mut stream)?;
-        handle_request(&request, &mut stream, &mut configuration, &mut state)?;
+        handle_request(&request, &mut stream, &mut configuration)?;
     }
 }
 
@@ -49,11 +48,11 @@ fn receive_and_parse(stream: &mut TcpStream) -> Result<Request> {
 /**
  * Handles the request and sends response to the socket
  */
-pub fn handle_request(request: &Request, stream: &mut TcpStream, configuration: &mut Configuration, state: &mut State) -> Result<()> {
+pub fn handle_request(request: &Request, stream: &mut TcpStream, configuration: &mut Configuration) -> Result<()> {
     println!("Received request: {:?}", request);
     let response = match request {
-        Request::Internal(req) => Response::Internal(req.handle_request(configuration, state)),
-        Request::External(req) => Response::External(req.handle_request(configuration, state)),
+        Request::Internal(req) => Response::Internal(req.handle_request(configuration)),
+        Request::External(req) => Response::External(req.handle_request(configuration)),
     };
 
     let bytes = serde_cbor::to_vec(&response)?;
