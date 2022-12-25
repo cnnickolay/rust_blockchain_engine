@@ -1,119 +1,123 @@
-use super::model::{BlockChain, Signature, Transaction};
+use super::blockchain::{HexString, PublicKeyStr};
 use anyhow::Result;
 use rsa::{
-    pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey},
-    pkcs8::der::Encode,
-    PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey,
+    pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPublicKey},
+    RsaPrivateKey, RsaPublicKey,
 };
-use sha1::Sha1;
-use sha2::{Digest, Sha256};
 
-fn compute_hash(blockchain: &BlockChain) -> String {
-    let hash = blockchain
-        .transactions
-        .iter()
-        .fold("0".to_string(), |result, transaction| {
-            let mut hasher = Sha256::new();
-            hasher.update(result.as_bytes());
-            hasher.update(transaction.from_address.0.as_bytes());
-            hasher.update(transaction.to_address.0.as_bytes());
-            hasher.update(transaction.amount.to_le_bytes());
-            hasher.update(transaction.signature.0.as_bytes());
-            let hash = hasher.finalize();
-            hex::encode(&hash[..])
-        });
+impl TryFrom<&PublicKeyStr> for RsaPrivateKey {
+    type Error = anyhow::Error;
 
-    hash
+    fn try_from(value: &PublicKeyStr) -> Result<Self, Self::Error> {
+        let key_bytes = hex::decode(&value.0 .0)?;
+        let key = RsaPrivateKey::from_pkcs1_der(&key_bytes)?;
+        Ok(key)
+    }
 }
 
-/**
- * Verifies the legitimacy of a transaction by checking its signature
- */
-fn verify_transaction(transaction: &Transaction) -> Result<()> {
-    let pub_key_str = hex::decode(&transaction.from_address.0)?;
-    let pub_key_restored = RsaPublicKey::from_pkcs1_der(&pub_key_str)?;
-    let digest = transaction.to_sha256_hash();
-    pub_key_restored.verify(
-        PaddingScheme::new_pkcs1v15_sign::<Sha256>(),
-        &digest,
-        &hex::decode(&transaction.signature.0).unwrap(),
-    )?;
-    Ok(())
+impl TryFrom<&PublicKeyStr> for RsaPublicKey {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &PublicKeyStr) -> Result<Self, Self::Error> {
+        let key_bytes = hex::decode(&value.0 .0)?;
+        let key = RsaPublicKey::from_pkcs1_der(&key_bytes)?;
+        Ok(key)
+    }
 }
 
-#[test]
-fn verify_transaction_test_success() {
+impl TryFrom<&RsaPrivateKey> for PublicKeyStr {
+    type Error = anyhow::Error;
+
+    fn try_from(key: &RsaPrivateKey) -> Result<Self, Self::Error> {
+        let key_str = hex::encode(key.to_pkcs1_der()?);
+        Ok(PublicKeyStr(HexString(key_str)))
+    }
+}
+
+impl TryFrom<&RsaPublicKey> for PublicKeyStr {
+    type Error = anyhow::Error;
+
+    fn try_from(key: &RsaPublicKey) -> Result<Self, Self::Error> {
+        let key_str = hex::encode(key.to_pkcs1_der()?);
+        Ok(PublicKeyStr(HexString(key_str)))
+    }
+}
+
+fn generate_rsa_key_pair() -> Result<(RsaPrivateKey, RsaPublicKey)> {
     let mut rng = rand::thread_rng();
     let bits = 2048;
-    let from_priv_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+    let from_priv_key = RsaPrivateKey::new(&mut rng, bits)?;
     let from_pub_key = RsaPublicKey::from(&from_priv_key);
-    let to_priv_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-    let to_pub_key = RsaPublicKey::from(&to_priv_key);
-
-    let from_address = hex::encode(from_pub_key.to_pkcs1_der().unwrap());
-    let to_address = hex::encode(to_pub_key.to_pkcs1_der().unwrap());
-    let mut transaction = Transaction::new(&from_address, &to_address, 100, &"");
-    let digest = transaction.to_sha256_hash();
-
-    let signature = hex::encode(
-        from_priv_key
-            .sign(PaddingScheme::new_pkcs1v15_sign::<Sha256>(), &digest)
-            .unwrap(),
-    );
-    transaction.signature = Signature(signature);
-
-    verify_transaction(&transaction).unwrap();
+    Ok((from_priv_key, from_pub_key))
 }
 
-pub fn encrypt() {
-    println!("started");
-    let mut rng = rand::thread_rng();
-    let bits = 2048;
-    let priv_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-    let pub_key = RsaPublicKey::from(&priv_key);
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use sha1::Digest;
+    use sha2::Sha256;
 
-    let digest = Sha1::digest(b"hello world").to_vec();
+    use crate::model::blockchain::PublicKeyStr;
+    use crate::model::blockchain::Signature;
+    use crate::model::blockchain::Transaction;
+    use crate::model::blockchain::BlockChain;
 
-    let signature = priv_key
-        .sign(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest)
-        .unwrap();
-    let result = pub_key
-        .verify(
-            PaddingScheme::new_pkcs1v15_sign::<Sha1>(),
-            &digest,
-            &signature,
-        )
-        .unwrap();
+    use super::generate_rsa_key_pair;
 
-    // let pem = pub_key.to_pkcs1_pem(LineEnding::LF).unwrap();
-    let pem = hex::encode(pub_key.to_pkcs1_der().unwrap());
-    // let pem = String::from_utf8(pub_key.to_pkcs1_der().unwrap().as_bytes().to_vec()).unwrap();
-    println!("pem: {}", pem);
-    println!("signature: {}", hex::encode(&signature));
+    #[test]
+    fn signing_test_success() -> Result<()> {
+        let (private_key, public_key) = generate_rsa_key_pair()?;
+        let digest = Sha256::digest(b"Hello world").to_vec();
+        let signature = Signature::sign(&private_key, &digest)?;
+        signature.verify(&public_key, &digest)?;
+        Ok(())
+    }
 
-    // let pub_key_restored = RsaPublicKey::from_pkcs1_pem(&pem).unwrap();
-    let pub_key_restored = RsaPublicKey::from_pkcs1_der(&hex::decode(pem).unwrap()).unwrap();
-    let result = pub_key_restored
-        .verify(
-            PaddingScheme::new_pkcs1v15_sign::<Sha1>(),
-            &digest,
-            &signature,
-        )
-        .unwrap();
+    #[test]
+    fn signing_test_fail() -> Result<()> {
+        let (private_key, public_key) = generate_rsa_key_pair()?;
+        let digest = Sha256::digest(b"Hello world").to_vec();
+        let wrong_digest = Sha256::digest(b"Hello space").to_vec();
+        let signature = Signature::sign(&private_key, &digest)?;
+        match signature.verify(&public_key, &wrong_digest) {
+            Ok(_) => panic!("Test should fail"),
+            Err(_) => Ok(()),
+        }
+    }
 
-    // println!("encrypting");
-    // // Encrypt
-    // let enc_data = pub_key.encrypt(&mut rng, PaddingScheme::new_pkcs1v15_encrypt(), &data[..]).expect("failed to encrypt");
-    // assert_ne!(&data[..], &enc_data[..]);
+    #[test]
+    fn verify_transaction_test_success() {
+        let (from_priv_key, from_pub_key) =
+            generate_rsa_key_pair().expect("Unable to generate keys");
+        let (to_priv_key, to_pub_key) = generate_rsa_key_pair().expect("Unable to generate keys");
 
-    // println!("decrypting");
-    // // Decrypt
-    // let dec_data = priv_key.decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &enc_data).expect("failed to decrypt");
-    // assert_eq!(&data[..], &dec_data[..]);
-    // println!("finished");
-}
+        let from_address = PublicKeyStr::try_from(&from_pub_key).unwrap();
+        let to_address = PublicKeyStr::try_from(&to_pub_key).unwrap();
+        let mut transaction = Transaction::new(from_address, to_address, 100, Signature::empty());
+        let digest = transaction.to_sha256_hash_bytes();
 
-#[test]
-fn encrypt_test() {
-    encrypt()
+        let signature = Signature::sign(&from_priv_key, &digest).unwrap();
+
+        transaction.signature = signature;
+
+        transaction.verify_transaction().unwrap();
+    }
+
+    #[test]
+    fn calculate_blockchain_hash_success() {
+        let transaction_1 = || Transaction::new(PublicKeyStr::from_str("111"), PublicKeyStr::from_str("222"), 10, Signature::empty());
+        let transaction_2 = || Transaction::new(PublicKeyStr::from_str("999"), PublicKeyStr::from_str("888"), 10, Signature::empty());
+        let transaction_3 = || Transaction::new(PublicKeyStr::from_str("112"), PublicKeyStr::from_str("222"), 10, Signature::empty());
+        
+        let blockchain_1_hash = BlockChain::from_vector(vec![transaction_1(), transaction_2()]).compute_hash();
+        let blockchain_2_hash = BlockChain::from_vector(vec![transaction_3(), transaction_2()]).compute_hash();
+        assert_ne!(blockchain_1_hash, blockchain_2_hash);
+
+        let blockchain_1_hash_recalculated = BlockChain::from_vector(vec![transaction_1(), transaction_2()]).compute_hash();
+        assert_eq!(blockchain_1_hash, blockchain_1_hash_recalculated);
+
+        let blockchain_1_hash = BlockChain::from_vector(vec![transaction_1(), transaction_2()]).compute_hash();
+        let blockchain_2_hash = BlockChain::from_vector(vec![transaction_2()]).compute_hash();
+        assert_ne!(blockchain_1_hash, blockchain_2_hash);
+    }
 }

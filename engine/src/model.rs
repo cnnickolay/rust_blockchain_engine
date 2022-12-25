@@ -1,5 +1,5 @@
-mod model;
-mod model_impl;
+mod blockchain;
+mod blockchain_impl;
 mod blockchain_operations;
 
 pub struct BlockChain;
