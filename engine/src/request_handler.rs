@@ -22,8 +22,12 @@ impl RequestHandler<InternalResponse> for InternalRequest {
                     NodeType::Validator => panic!("Validator can't on-board another validator"),
                 };
 
-                InternalResponse::Success(CommandResponse::OnBoardValidatorResponse)
+                InternalResponse::Success {
+                    request_id: self.request_id.to_owned(),
+                    response: CommandResponse::OnBoardValidatorResponse
+                }
             },
+            protocol::internal::CommandRequest::ValidateAndCommitTransaction { from, to, amount, signature } => todo!(),
         }
     }
 }

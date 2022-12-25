@@ -1,4 +1,4 @@
-use super::blockchain::{BlockChain, HexString, PublicKeyStr, Signature, Transaction};
+use super::blockchain::{Block, BlockChain, HexString, PublicKeyStr, Signature, Transaction};
 use anyhow::Result;
 use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 use sha1::Digest;
@@ -6,70 +6,143 @@ use sha2::Sha256;
 
 impl BlockChain {
     pub fn new() -> Self {
-        BlockChain {
-            transactions: Vec::new(),
+        BlockChain { blocks: Vec::new() }
+    }
+
+    pub fn from_vector(signed_transactions: &[(Transaction, Signature)]) -> Result<Self> {
+        let mut blockchain = BlockChain::new();
+
+        for (transaction, signature) in signed_transactions {
+            blockchain.append_blockchain((*transaction).clone(), (*signature).clone())?;
         }
+
+        Ok(blockchain)
     }
 
-    pub fn from_vector(transactions: Vec<Transaction>) -> Self {
-        BlockChain {
-            transactions,
-        }
+    /**
+     * Adds new transaction to the blockchain.
+     * The transaction has to be signed
+     */
+    pub fn append_blockchain(
+        &mut self,
+        transaction: Transaction,
+        signature: Signature,
+    ) -> Result<()> {
+        transaction.verify_transaction(&signature)?;
+
+        let tip_hash = if self.blocks.is_empty() {
+            "0".to_string()
+        } else {
+            self.blocks[self.blocks.len() - 1].hash.to_owned()
+        };
+
+        let mut hasher = Sha256::new();
+        hasher.update(tip_hash.as_bytes());
+        hasher.update(transaction.to_sha256_hash());
+        let next_hash = hasher.finalize().to_vec();
+
+        let block = Block {
+            prev_hash: tip_hash,
+            hash: hex::encode(next_hash),
+            transaction,
+            transaction_signature: signature,
+        };
+
+        self.blocks.push(block);
+
+        Ok(())
     }
 
-    pub fn add_transaction(&mut self, transaction: Transaction) {
-        self.transactions.push(transaction);
+    pub fn hash(&self) -> Option<String> {
+        self.blocks.last().map(|b| b.hash.clone())
     }
 
-    pub fn compute_hash(&self) -> String {
-        let hash = self
-            .transactions
+    /**
+     * Computes the hash of the last transaction and verifies each transaction in the process
+     */
+    pub fn validate_blockchain(&self) -> Result<String> {
+        let hash: Result<String> = self
+            .blocks
             .iter()
-            .fold("0".to_string(), |result, transaction| {
-                let mut hasher = Sha256::new();
-                hasher.update(result.as_bytes());
-                hasher.update(transaction.from_address.0 .0.as_bytes());
-                hasher.update(transaction.to_address.0 .0.as_bytes());
-                hasher.update(transaction.amount.to_le_bytes());
-                hasher.update(transaction.signature.0 .0.as_bytes());
-                let hash = hasher.finalize();
-                hex::encode(&hash[..])
+            .try_fold("0".to_string(), |last_hash, block| {
+                let transaction = &block.transaction;
+                transaction.verify_transaction(&block.transaction_signature)?;
+                let block_hash = Block::calculate_block_hash(&last_hash, &block.transaction, &block.transaction_signature)?;
+
+                if block_hash != block.hash {
+                    return Err(anyhow::anyhow!("Existing block hash does not match to transaction hash: {} vs {}", block_hash, block.hash));
+                }
+
+                Ok(block_hash)
             });
-    
+
         hash
     }
 }
 
-impl Transaction {
-    pub fn new(
-        from_address: PublicKeyStr,
-        to_address: PublicKeyStr,
+impl Block {
+    pub fn new_signed(
+        tip_hash: &str,
+        private_key: &RsaPrivateKey,
+        from_address: &RsaPublicKey,
+        to_address: &RsaPublicKey,
         amount: u64,
-        signature: Signature,
-    ) -> Self {
+    ) -> Result<Self> {
+        let transaction =
+            Transaction::new(from_address.try_into()?, to_address.try_into()?, amount);
+        let hash = &transaction.to_sha256_hash();
+        let signature = Signature::sign(private_key, hash)?;
+
+        let next_hash = Block::calculate_block_hash(&tip_hash, &transaction, &signature)?;
+
+        let block = Block {
+            prev_hash: tip_hash.to_owned(),
+            hash: next_hash,
+            transaction,
+            transaction_signature: signature,
+        };
+
+        Ok(block)
+    }
+
+    pub fn calculate_block_hash(
+        last_hash: &str,
+        transaction: &Transaction,
+        signature: &Signature,
+    ) -> Result<String> {
+        let mut hasher = Sha256::new();
+        hasher.update(last_hash.as_bytes());
+        hasher.update(transaction.to_sha256_hash());
+        hasher.update(signature.0 .0.as_bytes());
+        let next_hash = String::from_utf8(Sha256::digest(hasher.finalize()).to_vec())?;
+        Ok(next_hash)
+    }
+}
+
+impl Transaction {
+    pub fn new(from_address: PublicKeyStr, to_address: PublicKeyStr, amount: u64) -> Self {
         Transaction {
-            from_address: from_address,
-            to_address: to_address,
+            from_address,
+            to_address,
             amount,
-            signature: signature,
         }
     }
 
-    pub fn to_sha256_hash_bytes(&self) -> Vec<u8> {
-        let mut transaction_str = String::new();
-        transaction_str.push_str(&self.from_address.0 .0);
-        transaction_str.push_str(&self.to_address.0 .0);
-        transaction_str.push_str(&self.amount.to_string());
-        Sha256::digest(transaction_str).to_vec()
+    pub fn to_sha256_hash(&self) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.update(self.from_address.0 .0.as_bytes());
+        hasher.update(self.to_address.0 .0.as_bytes());
+        hasher.update(self.amount.to_ne_bytes());
+        hasher.finalize().to_vec()
     }
 
     /**
      * Verifies the legitimacy of a transaction by checking its signature
      */
-    pub fn verify_transaction(&self) -> Result<()> {
+    pub fn verify_transaction(&self, signature: &Signature) -> Result<()> {
         let public_key = RsaPublicKey::try_from(&self.from_address)?;
-        let digest = self.to_sha256_hash_bytes();
-        self.signature.verify(&public_key, &digest)?;
+        let digest = self.to_sha256_hash();
+        signature.verify(&public_key, &digest)?;
         Ok(())
     }
 }
