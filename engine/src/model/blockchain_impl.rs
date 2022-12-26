@@ -1,22 +1,42 @@
-use super::blockchain::{Block, BlockChain, HexString, PublicKeyStr, Signature, Transaction};
+use super::blockchain::{Block, BlockChain, HexString, PublicKeyStr, Signature, Transaction, InitialBlock};
 use anyhow::Result;
 use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 use sha1::Digest;
 use sha2::Sha256;
 
 impl BlockChain {
-    pub fn new() -> Self {
-        BlockChain { blocks: Vec::new() }
+    pub fn new(address: &PublicKeyStr, balance: u64) -> Self {
+        BlockChain {
+            initial_block: InitialBlock{ address: address.clone(), balance },
+            blocks: Vec::new() 
+        }
     }
 
-    pub fn from_vector(signed_transactions: &[(Transaction, Signature)]) -> Result<Self> {
-        let mut blockchain = BlockChain::new();
+    pub fn from_vector(initial_address: &PublicKeyStr, initial_balance: u64, signed_transactions: &[(Transaction, Signature)]) -> Result<Self> {
+        let mut blockchain = BlockChain::new(initial_address, initial_balance);
 
         for (transaction, signature) in signed_transactions {
             blockchain.append_blockchain((*transaction).clone(), (*signature).clone())?;
         }
 
         Ok(blockchain)
+    }
+
+    pub fn balance_for_address(&self, address: &PublicKeyStr) -> Result<u64> {
+        let mut balance = if self.initial_block.address == *address {
+            self.initial_block.balance
+        } else {
+            0
+        };
+
+        for block in &self.blocks {
+            if block.transaction.from_address == *address {
+                balance -= block.transaction.amount;
+            } else if block.transaction.to_address == *address {
+                balance += block.transaction.amount;
+            }
+        }
+        Ok(balance)
     }
 
     /**
@@ -29,6 +49,11 @@ impl BlockChain {
         signature: Signature,
     ) -> Result<()> {
         transaction.verify_transaction(&signature)?;
+
+        let balance = self.balance_for_address(&transaction.from_address)?;
+        if balance < transaction.amount {
+            return Err(anyhow::anyhow!("Address {} has insufficient funds: {}", &transaction.from_address, balance));
+        }
 
         let tip_hash = if self.blocks.is_empty() {
             "0".to_string()

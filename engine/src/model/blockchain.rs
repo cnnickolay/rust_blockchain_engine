@@ -1,4 +1,6 @@
-#[derive(Clone)]
+use std::fmt::{Display, Formatter};
+
+#[derive(Clone, PartialEq)]
 pub struct Transaction {
     pub from_address: PublicKeyStr,
     pub to_address: PublicKeyStr,
@@ -6,7 +8,13 @@ pub struct Transaction {
 }
 
 pub struct BlockChain {
+    pub initial_block: InitialBlock,
     pub blocks: Vec<Block>,
+}
+
+pub struct InitialBlock {
+    pub address: PublicKeyStr,
+    pub balance: u64,
 }
 
 pub struct Block {
@@ -22,8 +30,14 @@ pub struct Block {
 #[derive(Clone)]
 pub struct Signature(pub HexString);
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct PublicKeyStr(pub HexString);
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct HexString(pub String);
+
+impl Display for PublicKeyStr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.0)
+    }
+}
