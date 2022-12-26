@@ -164,6 +164,7 @@ dependencies = [
  "serde_cbor",
  "sha1",
  "sha2",
+ "uuid",
 ]
 
 [[package]]

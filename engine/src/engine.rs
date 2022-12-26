@@ -51,8 +51,8 @@ fn receive_and_parse(stream: &mut TcpStream) -> Result<Request> {
 pub fn handle_request(request: &Request, stream: &mut TcpStream, configuration: &mut Configuration) -> Result<()> {
     println!("Received request: {:?}", request);
     let response = match request {
-        Request::Internal(req) => Response::Internal(req.handle_request(configuration)),
-        Request::External(req) => Response::External(req.handle_request(configuration)),
+        Request::Internal(req) => Response::Internal(req.handle_request(configuration)?),
+        Request::External(req) => Response::External(req.handle_request(configuration)?),
     };
 
     let bytes = serde_cbor::to_vec(&response)?;

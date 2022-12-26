@@ -18,6 +18,7 @@ impl Configuration {
     }
 }
 
+#[derive(PartialEq)]
 pub enum NodeType {
     /**
      * Coordinator node is responsible for receiving a request from the user and passing it to validators
@@ -31,7 +32,7 @@ pub enum NodeType {
     Validator
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ValidatorAddress(pub String);
 
 impl NodeType {
