@@ -4,17 +4,21 @@ use protocol::{
 };
 use serde::Serialize;
 
-use crate::configuration::{Configuration, NodeType, ValidatorAddress};
+use crate::{
+    configuration::{Configuration, NodeType, ValidatorAddress},
+    encryption::generate_rsa_key_pair,
+    model::{HexString, BlockChain, PublicKeyStr},
+};
 use anyhow::{anyhow, Result};
 
 pub trait RequestHandler<T: Serialize> {
     type RESPONSE;
-    fn handle_request(&self, configuration: &mut Configuration) -> Result<Self::RESPONSE>;
+    fn handle_request(&self, blockchain: &mut BlockChain, configuration: &mut Configuration) -> Result<Self::RESPONSE>;
 }
 
 impl RequestHandler<InternalResponse> for InternalRequest {
     type RESPONSE = InternalResponse;
-    fn handle_request(&self, configuration: &mut Configuration) -> Result<Self::RESPONSE> {
+    fn handle_request(&self, blockchain: &mut BlockChain, configuration: &mut Configuration) -> Result<Self::RESPONSE> {
         match &self.command {
             protocol::internal::CommandRequest::OnBoardValidator { return_address } => {
                 match configuration.node_type {
@@ -31,7 +35,7 @@ impl RequestHandler<InternalResponse> for InternalRequest {
                     NodeType::Validator => {
                         Err(anyhow!("Validator can't on-board another validator"))
                     }
-                };
+                }?;
 
                 Ok(InternalResponse::Success {
                     request_id: self.request_id.to_owned(),
@@ -59,7 +63,7 @@ impl RequestHandler<InternalResponse> for InternalRequest {
 
 impl RequestHandler<ExternalResponse> for ExternalRequest {
     type RESPONSE = ExternalResponse;
-    fn handle_request(&self, configuration: &mut Configuration) -> Result<Self::RESPONSE> {
+    fn handle_request(&self, blockchain: &mut BlockChain, configuration: &mut Configuration) -> Result<Self::RESPONSE> {
         println!("External request received");
         match &self.command {
             UserCommand::CreateRecord { data } => panic!("Not ready yet"),
@@ -72,6 +76,20 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
                     },
                 ))
             }
+            UserCommand::GenerateWallet => {
+                let (priv_k, pub_k) = &generate_rsa_key_pair()?;
+                Ok(ExternalResponse::Success(UserCommandResponse::GenerateWalletResponse {
+                    private_key: HexString::try_from(priv_k)?.0,
+                    public_key: HexString::try_from(pub_k)?.0,
+                }))
+            }
+            UserCommand::GenerateNonce { address } => {
+                let nonce = blockchain.request_nonce_for_address(&PublicKeyStr::from_str(&address[..]));
+
+                Ok(ExternalResponse::Success(UserCommandResponse::GenerateNonceResponse {
+                    nonce
+                }))
+            },
         }
     }
 }

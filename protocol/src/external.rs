@@ -1,13 +1,12 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::request::Request;
 
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExternalRequest {
     pub request_id: String,
-    pub command: UserCommand
+    pub command: UserCommand,
 }
 
 impl ExternalRequest {
@@ -15,24 +14,30 @@ impl ExternalRequest {
         let request_id = Uuid::new_v4().to_string();
         ExternalRequest {
             request_id,
-            command
+            command,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum UserCommand {
-    PingCommand {
-        msg: String
-    },
-    CreateRecord {
-        data: String
-    }
+    PingCommand { msg: String },
+    CreateRecord { data: String },
+    GenerateWallet,
+    GenerateNonce { address: String },
 }
 
 impl UserCommand {
     pub fn new_ping(msg: &str) -> UserCommand {
-        UserCommand::PingCommand { msg: msg.to_string() }
+        UserCommand::PingCommand {
+            msg: msg.to_string(),
+        }
+    }
+
+    pub fn new_generate_nonce(address: &str) -> UserCommand {
+        UserCommand::GenerateNonce {
+            address: address.to_string(),
+        }
     }
 
     pub fn to_request(self) -> Request {
@@ -44,14 +49,19 @@ impl UserCommand {
 pub enum UserCommandResponse {
     PingCommandResponse {
         request_id: String,
-        msg: String
-    }
+        msg: String,
+    },
+    GenerateWalletResponse {
+        private_key: String,
+        public_key: String,
+    },
+    GenerateNonceResponse {
+        nonce: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ExternalResponse {
     Success(UserCommandResponse),
-    Error {
-        msg: String
-    }
+    Error { msg: String },
 }

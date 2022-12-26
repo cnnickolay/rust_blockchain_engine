@@ -6,7 +6,6 @@ mod transaction;
 mod public_key_str;
 mod hex_string;
 
-pub struct BlockChain;
-pub struct Transaction;
-pub struct Signature;
-pub struct PublicKey;
+pub use public_key_str::PublicKeyStr;
+pub use hex_string::HexString;
+pub use blockchain::BlockChain;

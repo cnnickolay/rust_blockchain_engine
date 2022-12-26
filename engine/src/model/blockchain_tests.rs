@@ -6,6 +6,7 @@ mod tests {
     use sha2::Sha256;
 
     use crate::encryption::generate_rsa_key_pair;
+    use crate::model::HexString;
     use crate::model::blockchain::BlockChain;
     use crate::model::public_key_str::PublicKeyStr;
     use crate::model::signature::Signature;
@@ -14,6 +15,8 @@ mod tests {
     #[test]
     fn signing_test_success() -> Result<()> {
         let (private_key, public_key) = generate_rsa_key_pair()?;
+        let a = HexString::try_from(&private_key)?;
+        let b = HexString::try_from(&public_key)?;
         let digest = Sha256::digest(b"Hello world").to_vec();
         let signature = Signature::sign(&private_key, &digest)?;
         signature.verify(&public_key, &digest)?;

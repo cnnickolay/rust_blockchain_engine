@@ -1,20 +1,23 @@
 use std::{net::{TcpListener, TcpStream}, io::{Write, Read}};
 use anyhow::Result;
 use protocol::{request::Request, response::Response};
-use crate::{request_handler::RequestHandler, configuration::{Configuration, NodeType}, client::Client};
+use crate::{request_handler::RequestHandler, configuration::{Configuration, NodeType}, client::Client, model::BlockChain, encryption::generate_rsa_key_pair};
 
 pub fn run_coordinator_node(host: String, port: u16) -> Result<()> {
     let listener = TcpListener::bind(format!("{}:{}", host, port))?;
     println!("Coordinator node is running on {}:{}", host, port);
 
+    let (priv_key, pub_key) = &generate_rsa_key_pair()?;
+
     let mut configuration = Configuration::new(&host, port, NodeType::new_coordinator());
+    let mut blockchain = BlockChain::new(&pub_key.try_into()?, 100);
 
     loop {
         let (mut stream, addr) = listener.accept()?;
         println!("New connection opened");
     
         let request = receive_and_parse(&mut stream)?;
-        handle_request(&request, &mut stream, &mut configuration)?;
+        handle_request(&request, &mut stream, &mut blockchain, &mut configuration)?;
     }
 }
 
@@ -48,11 +51,11 @@ fn receive_and_parse(stream: &mut TcpStream) -> Result<Request> {
 /**
  * Handles the request and sends response to the socket
  */
-pub fn handle_request(request: &Request, stream: &mut TcpStream, configuration: &mut Configuration) -> Result<()> {
+pub fn handle_request(request: &Request, stream: &mut TcpStream, blockchain: &mut BlockChain, configuration: &mut Configuration) -> Result<()> {
     println!("Received request: {:?}", request);
     let response = match request {
-        Request::Internal(req) => Response::Internal(req.handle_request(configuration)?),
-        Request::External(req) => Response::External(req.handle_request(configuration)?),
+        Request::Internal(req) => Response::Internal(req.handle_request(blockchain, configuration)?),
+        Request::External(req) => Response::External(req.handle_request(blockchain, configuration)?),
     };
 
     let bytes = serde_cbor::to_vec(&response)?;
