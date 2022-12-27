@@ -93,4 +93,23 @@ mod tests {
             Err(_) => Ok(()),
         }
     }
+
+    #[test]
+    fn print_balances() -> Result<()> {
+        let (priv_1, pub_1) = &generate_rsa_key_pair()?;
+        let (_, pub_2) = &generate_rsa_key_pair()?;
+        let mut blockchain = BlockChain::new(&pub_1.try_into()?, 100);
+
+        assert_eq!(blockchain.all_balances().len(), 1);
+
+        let nonce = blockchain.request_nonce_for_address(&pub_1.try_into()?);
+        let transaction =
+        Transaction::new_unsigned(nonce, pub_1.try_into()?, pub_2.try_into()?, 10)
+            .sign(&priv_1)?;
+        blockchain.append_blockchain(transaction)?; // this one is successful
+
+        assert_eq!(blockchain.all_balances().len(), 2);
+
+        Ok(())
+    }
 }

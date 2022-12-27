@@ -2,7 +2,7 @@ use rsa::{RsaPrivateKey, RsaPublicKey};
 use anyhow::Result;
 use sha1::Digest;
 use sha2::Sha256;
-use super::{public_key_str::PublicKeyStr, signature::Signature};
+use super::{public_key_str::PublicKeyStr, signature::{Signature, self}};
 
 #[derive(Clone, PartialEq)]
 pub struct Transaction {
@@ -26,6 +26,22 @@ impl Transaction {
             to_address,
             amount,
             signature: Signature::empty(),
+        }
+    }
+
+    pub fn new_signed(
+        nonce: String,
+        from_address: PublicKeyStr,
+        to_address: PublicKeyStr,
+        amount: u64,
+        signature: Signature
+    ) -> Self {
+        Transaction {
+            nonce,
+            from_address,
+            to_address,
+            amount,
+            signature,
         }
     }
 

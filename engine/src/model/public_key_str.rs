@@ -5,7 +5,7 @@ use rsa::{RsaPublicKey, pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey}};
 use super::hex_string::HexString;
 
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PublicKeyStr(pub HexString);
 
 impl PublicKeyStr {

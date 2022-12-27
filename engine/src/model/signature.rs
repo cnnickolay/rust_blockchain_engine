@@ -27,4 +27,8 @@ impl Signature {
     pub fn empty() -> Self {
         Signature(HexString(String::new()))
     }
+
+    pub fn from_string(s: &str) -> Self {
+        Signature(HexString(s.to_string()))
+    }
 }

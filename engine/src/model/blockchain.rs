@@ -1,11 +1,9 @@
-use std::collections::HashMap;
+use super::{block::Block, public_key_str::PublicKeyStr, transaction::Transaction};
 use anyhow::Result;
 use sha1::Digest;
 use sha2::Sha256;
+use std::collections::HashMap;
 use uuid::Uuid;
-use super::{block::Block, public_key_str::PublicKeyStr, transaction::Transaction};
-
-
 
 pub struct BlockChain {
     pub initial_block: InitialBlock,
@@ -44,6 +42,29 @@ impl BlockChain {
         Ok(blockchain)
     }
 
+    pub fn all_balances(&self) -> Vec<(PublicKeyStr, u64)> {
+        let mut balances = HashMap::<PublicKeyStr, u64>::new();
+
+        balances.insert(self.initial_block.address.clone(), self.initial_block.balance);
+
+        for block in &self.blocks {
+            if balances.contains_key(&block.transaction.from_address) {
+                let result = balances.get_mut(&block.transaction.from_address).unwrap();
+                *result -= block.transaction.amount;
+            } else {
+                balances.insert(block.transaction.from_address.clone(), block.transaction.amount);
+            }
+
+            if balances.contains_key(&block.transaction.to_address) {
+                let result = balances.get_mut(&block.transaction.to_address).unwrap();
+                *result += block.transaction.amount;
+            } else {
+                balances.insert(block.transaction.to_address.clone(), block.transaction.amount);
+            }
+        }
+        Vec::from_iter(balances.into_iter())
+    }
+
     pub fn balance_for_address(&self, address: &PublicKeyStr) -> Result<u64> {
         let mut balance = if self.initial_block.address == *address {
             self.initial_block.balance
@@ -62,19 +83,21 @@ impl BlockChain {
     }
 
     pub fn request_nonce_for_address(&mut self, address: &PublicKeyStr) -> String {
-        let nonce = Uuid::new_v4().to_string();
-        self.nonces.insert((*address).clone(), nonce.clone());
-        nonce
+        let nonce = self.nonces.get(address).map(|v| Box::new(v.clone()))
+            .unwrap_or_else(|| {
+                let new_nonce = &Uuid::new_v4().to_string();
+                self.nonces.insert((*address).clone(), new_nonce.clone());
+                Box::new(new_nonce.clone())
+            });
+        
+        nonce.as_str().to_string()
     }
 
     /**
      * Adds new transaction to the blockchain.
      * The transaction has to be signed
      */
-    pub fn append_blockchain(
-        &mut self,
-        signed_transaction: Transaction,
-    ) -> Result<()> {
+    pub fn append_blockchain(&mut self, signed_transaction: Transaction) -> Result<()> {
         signed_transaction.verify_transaction()?;
         self.ensure_nonce_exists_and_valid(
             &signed_transaction.from_address,

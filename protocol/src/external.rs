@@ -25,6 +25,14 @@ pub enum UserCommand {
     CreateRecord { data: String },
     GenerateWallet,
     GenerateNonce { address: String },
+    PrintBalances,
+    Transaction {
+        nonce: String,
+        from: String,
+        to: String,
+        amount: u64,
+        signature: String,
+    }
 }
 
 impl UserCommand {
@@ -37,6 +45,16 @@ impl UserCommand {
     pub fn new_generate_nonce(address: &str) -> UserCommand {
         UserCommand::GenerateNonce {
             address: address.to_string(),
+        }
+    }
+
+    pub fn new_transaction(nonce: &str, from: &str, to: &str, amount: u64, signature: &str) -> UserCommand {
+        UserCommand::Transaction {
+            nonce: nonce.to_string(),
+            from: from.to_string(),
+            to: to.to_string(),
+            amount: amount,
+            signature: signature.to_string(),
         }
     }
 
@@ -58,6 +76,12 @@ pub enum UserCommandResponse {
     GenerateNonceResponse {
         nonce: String,
     },
+    PrintBalancesResponse {
+        balances: Vec<(String, u64)>,
+    },
+    TransactionResponse {
+        request_id: String,
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

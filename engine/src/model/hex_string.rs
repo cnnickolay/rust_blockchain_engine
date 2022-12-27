@@ -1,6 +1,6 @@
 use rsa::{RsaPrivateKey, RsaPublicKey};
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct HexString(pub String);
 
 impl TryFrom<&RsaPublicKey> for HexString {
@@ -23,22 +23,24 @@ impl TryFrom<&RsaPrivateKey> for HexString {
     }
 }
 
-// impl TryFrom<&HexString> for RsaPublicKey {
-//     type Error = anyhow::Error;
+impl TryFrom<&HexString> for RsaPublicKey {
+    type Error = anyhow::Error;
 
-//     fn try_from(value: &HexString) -> Result<Self, Self::Error> {
-//         let key_bytes = hex::decode(&value.0)?;
-//         let key = RsaPublicKey::from_pkcs1_der(&key_bytes)?;
-//         Ok(key)
-//     }
-// }
+    fn try_from(value: &HexString) -> Result<Self, Self::Error> {
+        use rsa::pkcs1::DecodeRsaPublicKey;
+        let key_bytes = hex::decode(&value.0)?;
+        let key = RsaPublicKey::from_pkcs1_der(&key_bytes)?;
+        Ok(key)
+    }
+}
 
-// impl TryFrom<&HexString> for RsaPrivateKey {
-//     type Error = anyhow::Error;
+impl TryFrom<&HexString> for RsaPrivateKey {
+    type Error = anyhow::Error;
 
-//     fn try_from(value: &HexString) -> Result<Self, Self::Error> {
-//         let key_bytes = hex::decode(&value.0)?;
-//         let key = RsaPrivateKey::from_pkcs1_der(&key_bytes)?;
-//         Ok(key)
-//     }
-// }
+    fn try_from(value: &HexString) -> Result<Self, Self::Error> {
+        use rsa::pkcs1::DecodeRsaPrivateKey;
+        let key_bytes = hex::decode(&value.0)?;
+        let key = RsaPrivateKey::from_pkcs1_der(&key_bytes)?;
+        Ok(key)
+    }
+}
