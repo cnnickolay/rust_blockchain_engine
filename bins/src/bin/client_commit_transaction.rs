@@ -1,7 +1,7 @@
 use engine::client::Client;
-use anyhow::{Result, anyhow};
-use clap::{Parser};
-use protocol::{external::{ExternalResponse, UserCommandResponse}, response::Response};
+use anyhow::Result;
+use clap::Parser;
+
 
 fn main() {
     let args = Args::parse();
@@ -13,13 +13,8 @@ fn main() {
 
 fn client(args: &Args) -> Result<()> {
     let client = Client::new(&args.destination);
-    let nonce_response = client.generate_nonce(&args.from_address)?;
-    if let Response::External(ExternalResponse::Success(UserCommandResponse::GenerateNonceResponse{ref nonce})) = nonce_response {
-        println!("Received {:?}", client.send_transaction(nonce, &args.from_address, &args.to_address, args.amount, &args.private_key)?);
-        Ok(())
-    } else {
-        Err(anyhow!("Failed to retrieve nonce"))
-    }
+    println!("Received {:?}", client.send_transaction(&args.from_address, &args.to_address, args.amount)?);
+    Ok(())
 }
 
 #[derive(Parser)]
@@ -30,9 +25,6 @@ struct Args {
 
     #[arg(short, long)]
     from_address: String,
-
-    #[arg(short, long)]
-    private_key: String,
 
     #[arg(short, long)]
     to_address: String,

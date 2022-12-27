@@ -146,8 +146,8 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
                             request_id: self.request_id.clone(),
                         },
                     )),
-                    Err(_) => Ok(ExternalResponse::Error {
-                        msg: "Failed to add transaction".to_string(),
+                    Err(err) => Ok(ExternalResponse::Error {
+                        msg: format!("Failed to add transaction: {}", err),
                     }),
                 }
             }
