@@ -11,3 +11,12 @@ impl TryFrom<&PrivateKeyStr> for RsaPrivateKey {
         (&HexString(value.0.clone())).try_into()
     }
 }
+
+impl TryFrom<&RsaPrivateKey> for PrivateKeyStr {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &RsaPrivateKey) -> Result<Self, Self::Error> {
+        let hex: HexString = value.try_into()?;
+        Ok(PrivateKeyStr(hex.0))
+    }
+}

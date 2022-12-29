@@ -3,7 +3,7 @@ use anyhow::Result;
 use sha2::Sha256;
 use super::hex_string::HexString;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Signature(pub HexString);
 
 impl Signature {
