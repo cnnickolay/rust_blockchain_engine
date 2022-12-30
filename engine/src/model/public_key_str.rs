@@ -1,11 +1,12 @@
 use std::fmt::{Display, Formatter};
 
 use rsa::{RsaPublicKey, pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey}};
+use serde::{Serialize, Deserialize};
 
 use super::hex_string::HexString;
 
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct PublicKeyStr(pub HexString);
 
 impl PublicKeyStr {

@@ -1,19 +1,23 @@
 use rsa::{RsaPrivateKey, PaddingScheme, RsaPublicKey, PublicKey};
 use anyhow::Result;
+use serde::{Serialize, Deserialize};
+use sha1::Digest;
 use sha2::Sha256;
 use super::hex_string::HexString;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Signature(pub HexString);
 
 impl Signature {
-    pub fn sign(private_key: &RsaPrivateKey, digest: &[u8]) -> Result<Signature> {
-        let signature =
-            hex::encode(private_key.sign(PaddingScheme::new_pkcs1v15_sign::<Sha256>(), &digest)?);
+    pub fn sign(private_key: &RsaPrivateKey, cbor: &[u8]) -> Result<Signature> {
+        let digest = Sha256::digest(cbor);
+        let signature_bytes = private_key.sign(PaddingScheme::new_pkcs1v15_sign::<Sha256>(), &digest)?;
+        let signature = hex::encode(signature_bytes);
         Ok(Signature(HexString(signature)))
     }
 
-    pub fn verify(&self, public_key: &RsaPublicKey, digest: &[u8]) -> Result<()> {
+    pub fn verify(&self, public_key: &RsaPublicKey, cbor: &[u8]) -> Result<()> {
+        let digest = Sha256::digest(cbor);
         let padding = PaddingScheme::new_pkcs1v15_sign::<Sha256>();
         let signature = hex::decode(&self.0 .0)?;
         public_key.verify(

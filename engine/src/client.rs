@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use protocol::{request::Request, response::Response, external::{UserCommand, ExternalResponse, UserCommandResponse}, internal};
 use rsa::RsaPrivateKey;
 
-use crate::model::{Transaction, PublicKeyStr, PrivateKeyStr};
+use crate::{model::{PublicKeyStr, PrivateKeyStr}, blockchain::{transaction::Transaction, cbor::Cbor, balanced_transaction::BalancedTransaction}};
 
 pub struct Client {
     destination: String,
@@ -27,33 +27,27 @@ impl Client {
         send_bytes(&self.destination, UserCommand::GenerateWallet.to_request())
     }
 
-    pub fn generate_nonce(&self, address: &str) -> Result<Response> {
-        send_bytes(&self.destination, UserCommand::new_generate_nonce(address).to_request())
-    }
-
     pub fn print_balances(&self) -> Result<Response> {
         send_bytes(&self.destination, UserCommand::PrintBalances.to_request())
     }
 
-    pub fn send_transaction(&self, from: &str, to: &str, amount: u64) -> Result<Response> {
-        let rsa_private_key = RsaPrivateKey::try_from(&PrivateKeyStr(from.to_string()))?;
-        let public_key = PublicKeyStr::try_from(&rsa_private_key.to_public_key())?;
+    pub fn balance_transaction(&self, from: &str, to: &str, amount: u64) -> Result<Response> {
+        send_bytes(&self.destination, UserCommand::new_balance_transaction(from, to, amount).to_request())
+    }
 
-        let nonce = self.generate_nonce(&public_key.0.0)?;
+    pub fn commit_transaction(&self, cbor: &str, private_key: &str) -> Result<Response> {
+        let rsa_private_key = RsaPrivateKey::try_from(&PrivateKeyStr(private_key.to_string()))?;
+        let balanced_transaction = BalancedTransaction::try_from(&Cbor::new(cbor))?;
 
-        if let Response::External(ExternalResponse::Success(UserCommandResponse::GenerateNonceResponse{ref nonce})) = nonce {
-            let signed_transaction = Transaction::new_unsigned(nonce.to_owned(), public_key.clone(), PublicKeyStr::from_str(to), amount)
-                .sign(&rsa_private_key)?;
-        
-            send_bytes(&self.destination, UserCommand::new_transaction(nonce, &public_key.0.0, to, amount, &signed_transaction.signature.0.0).to_request())
-        } else {
-            Err(anyhow!("Failed to retrieve nonce"))
-        }
+        let signed_transaction = balanced_transaction.sign(&rsa_private_key)?;
+        let signed_cbor: Cbor = (&signed_transaction).try_into()?;
+    
+        send_bytes(&self.destination, UserCommand::new_commit_transaction(&signed_cbor.0).to_request())
     }
 }
 
 pub fn send_bytes(destination: &str, msg: Request) -> Result<Response> {
-    println!("Sending {:?}", msg);
+    // println!("Sending {:?}", msg);
     let mut stream = TcpStream::connect(destination)?;
 
     let bytes = serde_cbor::to_vec(&msg)?;

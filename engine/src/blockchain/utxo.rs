@@ -1,17 +1,18 @@
+use serde::{Serialize, Deserialize};
 use sha1::Digest;
 use sha2::Sha256;
 use crate::model::PublicKeyStr;
 
 use super::uuid::Uuid;
 
-#[derive(Clone, Eq, Hash, PartialEq, Debug)]
+#[derive(Clone, Eq, Hash, PartialEq, Debug, Serialize, Deserialize)]
 pub struct UnspentOutput {
     pub id: UnspentOutputId,
     pub address: PublicKeyStr,
     pub amount: u64,
 }
 
-#[derive(Clone, Eq, Hash, PartialEq, Debug)]
+#[derive(Clone, Eq, Hash, PartialEq, Debug, Serialize, Deserialize)]
 pub struct UnspentOutputId(pub Uuid);
 
 impl UnspentOutput {

@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 serde = "1.0.151"
 protocol = {path="../protocol", version = "*"}
+serde_json = "1.0.91"
 serde_cbor = "0.11.2"
 anyhow = "1.0.68"
 uuid = {version = "1.2.2", features = ["v4"]}

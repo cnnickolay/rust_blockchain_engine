@@ -13,7 +13,7 @@ fn main() {
 
 fn client(args: &Args) -> Result<()> {
     let client = Client::new(&args.destination);
-    println!("Received {:?}", client.send_transaction(&args.from_address, &args.to_address, args.amount)?);
+    println!("{:?}", client.commit_transaction(&args.cbor, &args.private_key)?);
     Ok(())
 }
 
@@ -24,11 +24,8 @@ struct Args {
     destination: String,
 
     #[arg(short, long)]
-    from_address: String,
+    cbor: String,
 
     #[arg(short, long)]
-    to_address: String,
-
-    #[arg(short, long)]
-    amount: u64,
+    private_key: String,
 }

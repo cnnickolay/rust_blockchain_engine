@@ -24,14 +24,14 @@ pub enum UserCommand {
     PingCommand { msg: String },
     CreateRecord { data: String },
     GenerateWallet,
-    GenerateNonce { address: String },
     PrintBalances,
-    Transaction {
-        nonce: String,
+    BalanceTransaction {
         from: String,
         to: String,
         amount: u64,
-        signature: String,
+    },
+    CommitTransaction {
+        signed_transaction_cbor: String,
     }
 }
 
@@ -42,19 +42,17 @@ impl UserCommand {
         }
     }
 
-    pub fn new_generate_nonce(address: &str) -> UserCommand {
-        UserCommand::GenerateNonce {
-            address: address.to_string(),
+    pub fn new_balance_transaction(from: &str, to: &str, amount: u64) -> UserCommand {
+        UserCommand::BalanceTransaction {
+            from: from.to_string(),
+            to: to.to_string(),
+            amount,
         }
     }
 
-    pub fn new_transaction(nonce: &str, from: &str, to: &str, amount: u64, signature: &str) -> UserCommand {
-        UserCommand::Transaction {
-            nonce: nonce.to_string(),
-            from: from.to_string(),
-            to: to.to_string(),
-            amount: amount,
-            signature: signature.to_string(),
+    pub fn new_commit_transaction(signed_transaction_cbor: &str) -> UserCommand {
+        UserCommand::CommitTransaction {
+            signed_transaction_cbor: signed_transaction_cbor.to_owned(),
         }
     }
 
@@ -73,14 +71,16 @@ pub enum UserCommandResponse {
         private_key: String,
         public_key: String,
     },
-    GenerateNonceResponse {
-        nonce: String,
-    },
     PrintBalancesResponse {
         balances: Vec<(String, u64)>,
     },
-    TransactionResponse {
+    BalanceTransactionResponse {
         request_id: String,
+        body: String,
+        cbor: String,
+    },
+    CommitTransactionResponse {
+        transaction_id: String,
     }
 }
 
@@ -88,4 +88,13 @@ pub enum UserCommandResponse {
 pub enum ExternalResponse {
     Success(UserCommandResponse),
     Error { msg: String },
+}
+
+impl ExternalResponse {
+    pub fn success(&self) -> Option<&UserCommandResponse> {
+        match self {
+            ExternalResponse::Success(r) => Some(r),
+            _ => None
+        }
+    }
 }

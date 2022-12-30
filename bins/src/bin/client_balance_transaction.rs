@@ -1,6 +1,7 @@
 use engine::client::Client;
 use anyhow::Result;
-use clap::{Parser};
+use clap::Parser;
+
 
 fn main() {
     let args = Args::parse();
@@ -12,7 +13,8 @@ fn main() {
 
 fn client(args: &Args) -> Result<()> {
     let client = Client::new(&args.destination);
-    println!("Received {:?}", client.generate_nonce(&args.address)?);
+    let balanced_transaction_response = client.balance_transaction(&args.from_address, &args.to_address, args.amount)?;
+    println!("{}", serde_json::to_string_pretty(&balanced_transaction_response)?);
     Ok(())
 }
 
@@ -23,5 +25,11 @@ struct Args {
     destination: String,
 
     #[arg(short, long)]
-    address: String
+    from_address: String,
+
+    #[arg(short, long)]
+    to_address: String,
+
+    #[arg(short, long)]
+    amount: u64,
 }

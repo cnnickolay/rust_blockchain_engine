@@ -1,6 +1,7 @@
 use rsa::{RsaPrivateKey, RsaPublicKey};
+use serde::{Serialize, Deserialize};
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct HexString(pub String);
 
 impl TryFrom<&RsaPublicKey> for HexString {

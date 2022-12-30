@@ -1,6 +1,8 @@
 
 use std::collections::HashSet;
 
+use crate::model::PublicKeyStr;
+
 use super::{utxo::UnspentOutput, signed_balanced_transaction::{SignedBalancedTransaction}};
 use anyhow::{Result, anyhow};
 use rsa::RsaPublicKey;
@@ -34,12 +36,12 @@ impl BlockChain {
 
         // 3. make sure signature provided is correct
         let public_key = RsaPublicKey::try_from(from_address)?;
-        let digest = transaction.hash();
+        let cbor = transaction.balanced_transaction.to_cbor()?;
 
-        transaction.signature.verify(&public_key, &digest)?;
+        transaction.signature.verify(&public_key, &cbor)?;
 
         // 4. ensure that all input utxos are unspent
-        self.ensure_utxos_unspent(&transaction.inputs)?;
+        self.ensure_utxos_unspent(&transaction.inputs())?;
 
         Ok(())
     }
@@ -61,7 +63,7 @@ impl BlockChain {
 
         // check if at least one utxo has been spent
         for transaction in &self.transactions {
-            for utxo in &transaction.inputs {
+            for utxo in transaction.inputs() {
                 let hash = utxo.hash_str();
                 if input_utxos.contains(&hash) {
                     return Err(anyhow!("Utxo {} has already been spent", hash));
@@ -72,7 +74,7 @@ impl BlockChain {
         // make sure all utxos exist
         remaining_utxos.remove(&self.initial_utxo.hash_str());
         for transaction in &self.transactions {
-            for utxo in &transaction.outputs {
+            for utxo in transaction.outputs() {
                 remaining_utxos.remove(&utxo.hash_str());
             }
         }
@@ -82,6 +84,10 @@ impl BlockChain {
         }
         
         Ok(())
+    }
+
+    pub fn all_balances(&self) -> Vec<(PublicKeyStr, u64)> {
+        todo!()
     }
 
 }

@@ -2,13 +2,12 @@ use protocol::{
     external::{ExternalRequest, ExternalResponse, UserCommand, UserCommandResponse},
     internal::{CommandResponse, InternalRequest, InternalResponse},
 };
-use rsa::rand_core::block;
 use serde::Serialize;
 
 use crate::{
     configuration::{Configuration, NodeType, ValidatorAddress},
     encryption::generate_rsa_key_pair,
-    model::{BlockChain, HexString, PublicKeyStr, Signature, Transaction},
+    model::{HexString, PublicKeyStr, Signature}, blockchain::{blockchain::BlockChain, transaction::Transaction, balanced_transaction::BalancedTransaction, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor},
 };
 use anyhow::{anyhow, Result};
 
@@ -50,7 +49,7 @@ impl RequestHandler<InternalResponse> for InternalRequest {
                     request_id: self.request_id.to_owned(),
                     response: CommandResponse::OnBoardValidatorResponse,
                 })
-            }
+            },
             protocol::internal::CommandRequest::ValidateAndCommitTransaction {
                 from,
                 to,
@@ -88,7 +87,7 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
                         msg: format!("Original message: {}, PONG PONG", msg),
                     },
                 ))
-            }
+            },
             UserCommand::GenerateWallet => {
                 let (priv_k, pub_k) = &generate_rsa_key_pair()?;
                 Ok(ExternalResponse::Success(
@@ -97,15 +96,7 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
                         public_key: HexString::try_from(pub_k)?.0,
                     },
                 ))
-            }
-            UserCommand::GenerateNonce { address } => {
-                let nonce =
-                    blockchain.request_nonce_for_address(&PublicKeyStr::from_str(&address[..]));
-
-                Ok(ExternalResponse::Success(
-                    UserCommandResponse::GenerateNonceResponse { nonce },
-                ))
-            }
+            },
             UserCommand::PrintBalances => {
                 let shorten_public_address = |str: &str| {
                     let mut res = String::new();
@@ -125,32 +116,27 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
                 Ok(ExternalResponse::Success(
                     UserCommandResponse::PrintBalancesResponse { balances },
                 ))
-            }
-            UserCommand::Transaction {
-                nonce,
-                from,
-                to,
-                amount,
-                signature,
-            } => {
-                let transaction = Transaction::new_signed(
-                    nonce.clone(),
-                    PublicKeyStr::from_str(from),
-                    PublicKeyStr::from_str(to),
-                    *amount,
-                    Signature::from_string(signature),
-                );
-                match blockchain.append_blockchain(transaction) {
-                    Ok(_) => Ok(ExternalResponse::Success(
-                        UserCommandResponse::TransactionResponse {
-                            request_id: self.request_id.clone(),
-                        },
-                    )),
-                    Err(err) => Ok(ExternalResponse::Error {
-                        msg: format!("Failed to add transaction: {}", err),
-                    }),
-                }
-            }
+            },
+            
+            UserCommand::BalanceTransaction { from, to, amount } => {
+                let balanced_transaction = &Transaction::new(&PublicKeyStr::from_str(from), &PublicKeyStr::from_str(to), *amount).balance_transaction(blockchain)?;
+                let cbor_bytes = balanced_transaction.to_cbor()?;
+                let cbor = hex::encode(&cbor_bytes);
+                let body = serde_json::to_string_pretty(balanced_transaction)?;
+
+                Ok(ExternalResponse::Success(
+                    UserCommandResponse::BalanceTransactionResponse { request_id: self.request_id.clone(), body, cbor },
+                ))
+            },
+
+            UserCommand::CommitTransaction { signed_transaction_cbor } => {
+                let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&signed_transaction_cbor))?;
+                let result = signed_transaction.verify_and_commit(blockchain)?;
+
+                Ok(ExternalResponse::Success(
+                    UserCommandResponse::CommitTransactionResponse { transaction_id: result.id().0.0.to_owned() },
+                ))
+            },
         }
     }
 }

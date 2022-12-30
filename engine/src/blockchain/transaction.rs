@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::model::PublicKeyStr;
 use anyhow::{Result, anyhow};
 
-use super::{signed_balanced_transaction::{BalancedTransaction, TransactionId}, blockchain::BlockChain, utxo::UnspentOutput};
+use super::{blockchain::BlockChain, utxo::UnspentOutput, balanced_transaction::BalancedTransaction, transaction_id::TransactionId};
 
 pub struct Transaction {
     pub from: PublicKeyStr,
@@ -14,7 +14,7 @@ pub struct Transaction {
 impl Transaction {
 
     pub fn new(from: &PublicKeyStr, to: &PublicKeyStr, amount: u64) -> Transaction {
-        Transaction { from: from.clone(), to: to.clone(), amount: amount }
+        Transaction { from: from.clone(), to: to.clone(), amount }
     }
 
     pub fn balance_transaction(&self, blockchain: &BlockChain) -> Result<BalancedTransaction> {
@@ -24,7 +24,7 @@ impl Transaction {
         }
 
         for transaction in &blockchain.transactions {
-            for utxo in &transaction.outputs {
+            for utxo in transaction.outputs() {
                 if utxo.address == self.from {
                     unspent_utxos.insert(utxo.clone());
                 }
@@ -32,7 +32,7 @@ impl Transaction {
         }
 
         for transaction in &blockchain.transactions {
-            for utxo in &transaction.inputs {
+            for utxo in transaction.inputs() {
                 if utxo.address == self.from {
                     unspent_utxos.remove(utxo);
                 }

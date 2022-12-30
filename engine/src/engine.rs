@@ -1,11 +1,11 @@
 use crate::{
     client::Client,
     configuration::{Configuration, NodeType},
-    model::{BlockChain, PublicKeyStr},
-    request_handler::RequestHandler,
+    model::PublicKeyStr,
+    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput},
 };
 use anyhow::Result;
-use protocol::{request::Request, response::Response};
+use protocol::{request::Request, response::Response, internal::InternalResponse, external::ExternalResponse};
 use rsa::RsaPublicKey;
 use std::{
     io::{Read, Write},
@@ -20,14 +20,14 @@ pub fn run_coordinator_node(host: String, port: u16, root_public_key: &str) -> R
     let pub_key = RsaPublicKey::try_from(&pub_key_str)?;
 
     let mut configuration = Configuration::new(&host, port, NodeType::new_coordinator());
-    let mut blockchain = BlockChain::new(&pub_key_str, 100);
+    let mut blockchain = BlockChain::new(UnspentOutput::new(&pub_key_str, 100));
 
     loop {
         let (mut stream, addr) = listener.accept()?;
         println!("New connection opened");
 
         let request = receive_and_parse(&mut stream)?;
-        handle_request(&request, &mut stream, &mut blockchain, &mut configuration)?;
+        handle_request(&request, &mut stream, &mut blockchain, &mut configuration)?
     }
 }
 
@@ -70,10 +70,17 @@ pub fn handle_request(
     println!("Received request: {:?}", request);
     let response = match request {
         Request::Internal(req) => {
-            Response::Internal(req.handle_request(blockchain, configuration)?)
+            match req.handle_request(blockchain, configuration) {
+                Ok(result) => Response::Internal(result),
+                Err(err) => Response::Internal(InternalResponse::Error { msg: format!("{:?}", err) }),
+            }
+            
         }
         Request::External(req) => {
-            Response::External(req.handle_request(blockchain, configuration)?)
+            match req.handle_request(blockchain, configuration) {
+                Ok(result) => Response::External(result),
+                Err(err) => Response::External(ExternalResponse::Error { msg: format!("{:?}", err) }),
+            }
         }
     };
 
