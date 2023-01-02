@@ -29,12 +29,26 @@ pub enum CommandRequest {
         amount: u64,
         signature: String,
     },
+    CommitTransaction {
+        signed_transaction_cbor: String    
+    },
+    SynchronizeBlockchain {
+        address: String,
+        blockchain_hash: String,
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CommandResponse {
     OnBoardValidatorResponse,
     ValidateAndCommitTransactionResponse,
+    CommitTransactionResponse {
+        blockchain_hash: String
+    },
+    SynchronizeBlockchainResponse {
+        transaction_cbor: String,
+        expected_blockchain_hash: String,
+    }
 }
 
 // ################

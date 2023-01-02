@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+
     use crate::{blockchain::{transaction::Transaction, blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}};
 
     #[test]
@@ -23,8 +24,7 @@ mod tests {
 
         let signed_transaction = transaction.sign(&priv_1.try_into().unwrap()).unwrap();
 
-        blockchain.verify_transaction(&signed_transaction).unwrap();
-        blockchain.add_transaction(&signed_transaction).unwrap();
+        blockchain.commit_transaction(&signed_transaction).unwrap();
         assert_eq!(blockchain.transactions.len(), 1, "Number of transactions is wrong");
 
         // second transaction, with change
@@ -33,7 +33,7 @@ mod tests {
             .unwrap()
             .sign(&priv_2.try_into().unwrap())
             .unwrap()
-            .verify_and_commit(&mut blockchain)
+            .commit(&mut blockchain)
             .unwrap();
 
         assert_eq!(blockchain.transactions.len(), 2, "Number of transactions is wrong");
@@ -47,16 +47,14 @@ mod tests {
         assert_eq!(transaction.outputs()[1].address, *pub_1, "Change address is wrong");
         assert_eq!(transaction.outputs()[1].amount, 5, "Output amount is wrong");
 
-
         // third transaction
         let transaction = Transaction::new(&pub_2, &pub_1, 5)
             .balance_transaction(&blockchain)
             .unwrap()
             .sign(&priv_2.try_into().unwrap())
             .unwrap()
-            .verify_and_commit(&mut blockchain)
+            .commit(&mut blockchain)
             .unwrap();
-
         assert_eq!(blockchain.transactions.len(), 3, "Number of transactions is wrong");
 
         // fourth transaction
@@ -65,7 +63,7 @@ mod tests {
             .unwrap()
             .sign(&priv_1.try_into().unwrap())
             .unwrap()
-            .verify_and_commit(&mut blockchain)
+            .commit(&mut blockchain)
             .unwrap();
 
         assert_eq!(blockchain.transactions.len(), 4, "Number of transactions is wrong");
@@ -85,4 +83,5 @@ mod tests {
     #[test]
     fn balance_transaction_not_enough_funds() {
     }
+
 }

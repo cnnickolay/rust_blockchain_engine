@@ -3,9 +3,11 @@ use std::collections::HashSet;
 
 use crate::model::PublicKeyStr;
 
-use super::{utxo::UnspentOutput, signed_balanced_transaction::{SignedBalancedTransaction}};
+use super::{utxo::UnspentOutput, signed_balanced_transaction::{SignedBalancedTransaction}, cbor::Cbor};
 use anyhow::{Result, anyhow};
 use rsa::RsaPublicKey;
+use sha1::Digest;
+use sha2::Sha256;
 
 pub struct BlockChain {
     pub initial_utxo: UnspentOutput,
@@ -46,12 +48,13 @@ impl BlockChain {
         Ok(())
     }
 
-    pub fn add_transaction(&mut self, transaction: &SignedBalancedTransaction) -> Result<()> {
+    pub fn commit_transaction(&mut self, transaction: &SignedBalancedTransaction) -> Result<String> {
         self.verify_transaction(&transaction)?;
 
         self.transactions.push(transaction.clone());
 
-        Ok(())
+        let blockchain_hash = self.blockchain_hash()?;
+        Ok(blockchain_hash)
     }
 
     /**
@@ -88,6 +91,18 @@ impl BlockChain {
 
     pub fn all_balances(&self) -> Vec<(PublicKeyStr, u64)> {
         todo!()
+    }
+
+    pub fn blockchain_hash(&self) -> Result<String> {
+        let mut hasher = Sha256::new();
+        hasher.update(Cbor::try_from(&self.initial_utxo)?.hash());
+
+        for transaction in &self.transactions {
+            let hash = Cbor::try_from(transaction)?.hash();
+            hasher.update(hash);
+        }
+        let hash = hex::encode(hasher.finalize().to_vec());
+        Ok(hash)
     }
 
 }

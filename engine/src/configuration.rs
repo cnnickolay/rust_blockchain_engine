@@ -18,7 +18,7 @@ impl Configuration {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum NodeType {
     /**
      * Coordinator node is responsible for receiving a request from the user and passing it to validators

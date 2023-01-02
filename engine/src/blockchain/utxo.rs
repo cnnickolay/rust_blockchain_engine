@@ -3,7 +3,7 @@ use sha1::Digest;
 use sha2::Sha256;
 use crate::model::PublicKeyStr;
 
-use super::uuid::Uuid;
+use super::{uuid::Uuid, cbor::Cbor};
 
 #[derive(Clone, Eq, Hash, PartialEq, Debug, Serialize, Deserialize)]
 pub struct UnspentOutput {
@@ -42,5 +42,23 @@ impl UnspentOutput {
 
     pub fn hash_str(&self) -> String {
         hex::encode(self.hash())
+    }
+}
+
+impl TryFrom<&Cbor> for UnspentOutput {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &Cbor) -> Result<Self, Self::Error> {
+        let cbor_bytes = hex::decode(&value.0)?;
+        Ok(serde_cbor::from_slice(&cbor_bytes)?)
+    }
+}
+
+impl TryFrom<&UnspentOutput> for Cbor {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &UnspentOutput) -> Result<Self, Self::Error> {
+        let cbor = serde_cbor::to_vec(value)?;
+        Ok(Cbor(hex::encode(&cbor)))
     }
 }

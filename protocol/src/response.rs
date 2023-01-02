@@ -14,4 +14,10 @@ impl Response {
             _ => None,
         }
     }
+    pub fn internal_response(&self) -> Option<&InternalResponse> {
+        match self {
+            Response::Internal(internal) => Some(internal),
+            _ => None,
+        }
+    }
 }

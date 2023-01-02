@@ -71,8 +71,8 @@ impl SignedBalancedTransaction {
         }
     }
 
-    pub fn verify_and_commit(&self, blockchain: &mut BlockChain) -> Result<SignedBalancedTransaction> {
-        blockchain.add_transaction(self)?;
+    pub fn commit(&self, blockchain: &mut BlockChain) -> Result<SignedBalancedTransaction> {
+        let blockchain_hash = blockchain.commit_transaction(self)?;
         Ok(self.clone())
     }
 }
