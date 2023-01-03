@@ -1,31 +1,32 @@
 
 use std::collections::HashSet;
 
-use crate::model::PublicKeyStr;
+use crate::model::{PublicKeyStr, PrivateKeyStr};
 
-use super::{utxo::UnspentOutput, signed_balanced_transaction::{SignedBalancedTransaction}, cbor::Cbor};
+use super::{utxo::UnspentOutput, signed_balanced_transaction::{SignedBalancedTransaction}, block::Block};
 use anyhow::{Result, anyhow};
 use rsa::RsaPublicKey;
-use sha1::Digest;
-use sha2::Sha256;
 
 pub struct BlockChain {
+    pub validator_public_key: PublicKeyStr,
     pub initial_utxo: UnspentOutput,
-    pub transactions: Vec<SignedBalancedTransaction>,
+    pub blocks: Vec<Block>,
 }
 
 impl BlockChain {
-    pub fn new(initial_utxo: UnspentOutput) -> Self {
+    pub fn new(validator_public_key: &PublicKeyStr, initial_utxo: UnspentOutput) -> Self {
         Self {
+            validator_public_key: validator_public_key.clone(),
             initial_utxo,
-            transactions: vec![],
+            blocks: vec![],
         }
     }
 
-    pub fn new_testing(initial_utxo: UnspentOutput, transactions: Vec<SignedBalancedTransaction>) -> Self {
+    pub fn new_testing_only(validator_public_key: &PublicKeyStr, initial_utxo: UnspentOutput, blocks: Vec<Block>) -> Self {
         Self {
+            validator_public_key: validator_public_key.clone(),
             initial_utxo,
-            transactions,
+            blocks,
         }
     }
 
@@ -48,13 +49,21 @@ impl BlockChain {
         Ok(())
     }
 
-    pub fn commit_transaction(&mut self, transaction: &SignedBalancedTransaction) -> Result<String> {
+    pub fn commit_transaction(&mut self, transaction: &SignedBalancedTransaction, validator_private_key: &PrivateKeyStr) -> Result<String> {
         self.verify_transaction(&transaction)?;
 
-        self.transactions.push(transaction.clone());
+        let previous_block_hash = if self.blocks.is_empty() {
+            self.initial_utxo.hash()
+        } else {
+            hex::decode(&self.blocks.last().unwrap().hash)?
+        };
 
-        let blockchain_hash = self.blockchain_hash()?;
-        Ok(blockchain_hash)
+        let block = Block::create_block_and_sign(&previous_block_hash, transaction, validator_private_key)?;
+        let hash = block.hash.clone();
+
+        self.blocks.push(block);
+
+        Ok(hash)
     }
 
     /**
@@ -65,8 +74,8 @@ impl BlockChain {
         let mut remaining_utxos = HashSet::<String>::from_iter(input_utxos.clone());
 
         // check if at least one utxo has been spent
-        for transaction in &self.transactions {
-            for utxo in transaction.inputs() {
+        for block in &self.blocks {
+            for utxo in block.transaction.inputs() {
                 let hash = utxo.hash_str();
                 if input_utxos.contains(&hash) {
                     return Err(anyhow!("Utxo {} has already been spent", hash));
@@ -76,8 +85,8 @@ impl BlockChain {
 
         // make sure all utxos exist
         remaining_utxos.remove(&self.initial_utxo.hash_str());
-        for transaction in &self.transactions {
-            for utxo in transaction.outputs() {
+        for block in &self.blocks {
+            for utxo in block.transaction.outputs() {
                 remaining_utxos.remove(&utxo.hash_str());
             }
         }
@@ -94,14 +103,16 @@ impl BlockChain {
     }
 
     pub fn blockchain_hash(&self) -> Result<String> {
-        let mut hasher = Sha256::new();
-        hasher.update(Cbor::try_from(&self.initial_utxo)?.hash());
-
-        for transaction in &self.transactions {
-            let hash = Cbor::try_from(transaction)?.hash();
-            hasher.update(hash);
+        let mut last_block_hash = Box::new(self.initial_utxo.hash());
+        for (idx, block) in self.blocks.iter().enumerate() {
+            if !block.verify_block(&last_block_hash)? {
+                return Err(anyhow::anyhow!("Blockchain corrupted at index {}. Verification failed", idx));
+            } else {
+                let block_hash = hex::decode(&block.hash)?;
+                last_block_hash = Box::new(block_hash.clone());
+            }
         }
-        let hash = hex::encode(hasher.finalize().to_vec());
+        let hash = hex::encode(last_block_hash.as_slice());
         Ok(hash)
     }
 

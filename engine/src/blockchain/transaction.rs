@@ -23,16 +23,16 @@ impl Transaction {
             unspent_utxos.insert(blockchain.initial_utxo.clone());
         }
 
-        for transaction in &blockchain.transactions {
-            for utxo in transaction.outputs() {
+        for block in &blockchain.blocks {
+            for utxo in block.transaction.outputs() {
                 if utxo.address == self.from {
                     unspent_utxos.insert(utxo.clone());
                 }
             }
         }
 
-        for transaction in &blockchain.transactions {
-            for utxo in transaction.inputs() {
+        for block in &blockchain.blocks {
+            for utxo in block.transaction.inputs() {
                 if utxo.address == self.from {
                     unspent_utxos.remove(utxo);
                 }

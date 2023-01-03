@@ -2,7 +2,7 @@ use crate::{
     client::Client,
     configuration::{Configuration, NodeType},
     model::PublicKeyStr,
-    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput},
+    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_key_pair, generate_rsa_keypair_custom},
 };
 use anyhow::Result;
 use protocol::{request::Request, response::Response, internal::InternalResponse, external::ExternalResponse};
@@ -18,9 +18,10 @@ pub fn run_coordinator_node(host: String, port: u16, root_public_key: &str) -> R
 
     let pub_key_str = PublicKeyStr::from_str(root_public_key);
     let pub_key = RsaPublicKey::try_from(&pub_key_str)?;
+    let (validator_private_key, validator_public_key) = &generate_rsa_keypair_custom()?;
 
-    let mut configuration = Configuration::new(&host, port, NodeType::new_coordinator());
-    let mut blockchain = BlockChain::new(UnspentOutput::new(&pub_key_str, 100));
+    let mut configuration = Configuration::new(&host, port, NodeType::new_coordinator(), validator_private_key);
+    let mut blockchain = BlockChain::new(validator_public_key, UnspentOutput::new(&pub_key_str, 100));
 
     loop {
         let (mut stream, addr) = listener.accept()?;

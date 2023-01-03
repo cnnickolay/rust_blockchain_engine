@@ -2,6 +2,7 @@ use rsa::RsaPrivateKey;
 
 use super::HexString;
 
+#[derive(Clone)]
 pub struct PrivateKeyStr(pub String);
 
 impl TryFrom<&PrivateKeyStr> for RsaPrivateKey {

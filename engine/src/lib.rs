@@ -9,7 +9,6 @@ pub mod client;
 pub mod configuration;
 pub mod encryption;
 pub mod blockchain;
-pub mod consensus;
 
 pub use engine::run_coordinator_node as coordinator_program;
 pub use engine::run_validator_node as validator_program;

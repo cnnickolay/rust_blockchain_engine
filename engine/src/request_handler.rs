@@ -67,7 +67,7 @@ impl RequestHandler<InternalResponse> for InternalRequest {
             },
             protocol::internal::CommandRequest::CommitTransaction { signed_transaction_cbor } => {
                 let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&signed_transaction_cbor))?;
-                signed_transaction.commit(blockchain)?;
+                signed_transaction.commit(blockchain, &configuration.validator_private_key)?;
                 let blockchain_hash = blockchain.blockchain_hash()?;
 
                 Ok(InternalResponse::Success {

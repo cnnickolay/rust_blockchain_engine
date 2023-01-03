@@ -1,4 +1,4 @@
-use crate::model::{Signature, PublicKeyStr};
+use crate::model::{Signature, PublicKeyStr, PrivateKeyStr};
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use super::{utxo::UnspentOutput, blockchain::BlockChain, transaction_id::TransactionId, balanced_transaction::{BalancedTransaction}, cbor::Cbor};
@@ -71,9 +71,13 @@ impl SignedBalancedTransaction {
         }
     }
 
-    pub fn commit(&self, blockchain: &mut BlockChain) -> Result<SignedBalancedTransaction> {
-        let blockchain_hash = blockchain.commit_transaction(self)?;
+    pub fn commit(&self, blockchain: &mut BlockChain, validator_private_key: &PrivateKeyStr) -> Result<SignedBalancedTransaction> {
+        let blockchain_hash = blockchain.commit_transaction(self, validator_private_key)?;
         Ok(self.clone())
+    }
+
+    pub fn hash(&self) -> Result<Vec<u8>> {
+        Ok(Cbor::try_from(self)?.hash())
     }
 }
 
