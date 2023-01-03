@@ -40,7 +40,9 @@ pub enum CommandRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CommandResponse {
-    OnBoardValidatorResponse,
+    OnBoardValidatorResponse {
+        validators: Vec<String>
+    },
     ValidateAndCommitTransactionResponse,
     CommitTransactionResponse {
         blockchain_hash: String

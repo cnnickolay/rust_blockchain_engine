@@ -9,7 +9,7 @@ There are CLI apps in bins directory which can be used for spinning app a blockc
 
 1. Run blockchain coordinator (validators are not necessary at this stage)
 ```
-target/debug/coordinator_node -r "$(<test-data/root_public_key)"
+target/debug/node -r "$(<test-data/root_public_key)"
 ```
 
 2. Balance a transaction

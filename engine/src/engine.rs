@@ -1,8 +1,7 @@
 use crate::{
-    client::Client,
-    configuration::{Configuration, NodeType},
+    configuration::Configuration,
     model::PublicKeyStr,
-    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_key_pair, generate_rsa_keypair_custom},
+    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom},
 };
 use anyhow::Result;
 use protocol::{request::Request, response::Response, internal::InternalResponse, external::ExternalResponse};
@@ -12,15 +11,15 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-pub fn run_coordinator_node(host: String, port: u16, root_public_key: &str) -> Result<()> {
+pub fn run_node(host: String, port: u16, root_public_key: &str) -> Result<()> {
     let listener = TcpListener::bind(format!("{}:{}", host, port))?;
-    println!("Coordinator node is running on {}:{}", host, port);
+    println!("Validator node is running on {}:{}", host, port);
 
     let pub_key_str = PublicKeyStr::from_str(root_public_key);
     let pub_key = RsaPublicKey::try_from(&pub_key_str)?;
     let (validator_private_key, validator_public_key) = &generate_rsa_keypair_custom()?;
 
-    let mut configuration = Configuration::new(&host, port, NodeType::new_coordinator(), validator_private_key);
+    let mut configuration = Configuration::new(&host, port, validator_private_key);
     let mut blockchain = BlockChain::new(validator_public_key, UnspentOutput::new(&pub_key_str, 100));
 
     loop {
@@ -29,18 +28,6 @@ pub fn run_coordinator_node(host: String, port: u16, root_public_key: &str) -> R
 
         let request = receive_and_parse(&mut stream)?;
         handle_request(&request, &mut stream, &mut blockchain, &mut configuration)?
-    }
-}
-
-pub fn run_validator_node(host: String, port: u16, coordinator_ip: &str) -> Result<()> {
-    let listener = TcpListener::bind(format!("{}:{}", host, port))?;
-    println!("Validator node is running on {}:{}", host, port);
-
-    let client = Client::new(coordinator_ip);
-    client.register_validator(&host, port)?;
-
-    loop {
-        let (mut stream, addr) = listener.accept()?;
     }
 }
 
