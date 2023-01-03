@@ -1,7 +1,7 @@
 use std::{net::TcpStream, io::Write};
 
 use anyhow::{Result, anyhow};
-use protocol::{request::Request, response::Response, external::{UserCommand, ExternalResponse, UserCommandResponse}, internal};
+use protocol::{request::Request, response::Response, external::{UserCommand, ExternalResponse, UserCommandResponse}, internal::{self, InternalResponse, CommandResponse, Validator}};
 use rsa::RsaPrivateKey;
 
 use crate::{model::{PublicKeyStr, PrivateKeyStr}, blockchain::{transaction::Transaction, cbor::Cbor, balanced_transaction::BalancedTransaction}};
@@ -19,8 +19,12 @@ impl Client {
         send_bytes(&self.destination, UserCommand::new_ping(msg).to_request())
     }
 
-    pub fn register_validator(&self, ip: &str, port: u16) -> Result<Response> {
-        send_bytes(&self.destination, internal::CommandRequest::new_on_board_command(&format!("{}:{}", ip, port)).to_request())
+    pub fn register_validator(&self, address: &str, public_key: &PublicKeyStr, retransmitted: bool) -> Result<Vec<Validator>> {
+        let response = send_bytes(&self.destination, internal::CommandRequest::new_on_board_command(&address, &public_key.0.0, retransmitted).to_request())?;
+        match response {
+            Response::Internal(InternalResponse::Success {response: CommandResponse::OnBoardValidatorResponse{validators}, ..}) => Ok(validators),
+            bad_response => Err(anyhow!("Wrong response for registering validator: {:?}", bad_response))
+        } 
     }
 
     pub fn generate_wallet(&self) -> Result<Response> {

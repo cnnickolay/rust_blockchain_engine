@@ -49,7 +49,7 @@ impl BlockChain {
         Ok(())
     }
 
-    pub fn commit_transaction(&mut self, transaction: &SignedBalancedTransaction, validator_private_key: &PrivateKeyStr) -> Result<String> {
+    pub fn commit_transaction(&mut self, transaction: &SignedBalancedTransaction, validator_private_key: &PrivateKeyStr) -> Result<Block> {
         self.verify_transaction(&transaction)?;
 
         let previous_block_hash = if self.blocks.is_empty() {
@@ -59,11 +59,10 @@ impl BlockChain {
         };
 
         let block = Block::create_block_and_sign(&previous_block_hash, transaction, validator_private_key)?;
-        let hash = block.hash.clone();
 
-        self.blocks.push(block);
+        self.blocks.push(block.clone());
 
-        Ok(hash)
+        Ok(block)
     }
 
     /**

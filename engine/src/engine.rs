@@ -1,7 +1,7 @@
 use crate::{
-    configuration::Configuration,
-    model::PublicKeyStr,
-    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom},
+    configuration::{Configuration, ValidatorAddress},
+    model::{PublicKeyStr, PrivateKeyStr},
+    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}, client::Client,
 };
 use anyhow::Result;
 use protocol::{request::Request, response::Response, internal::InternalResponse, external::ExternalResponse};
@@ -11,7 +11,7 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-pub fn run_node(host: String, port: u16, root_public_key: &str) -> Result<()> {
+pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator_opt: Option<&str>) -> Result<()> {
     let listener = TcpListener::bind(format!("{}:{}", host, port))?;
     println!("Validator node is running on {}:{}", host, port);
 
@@ -22,6 +22,10 @@ pub fn run_node(host: String, port: u16, root_public_key: &str) -> Result<()> {
     let mut configuration = Configuration::new(&host, port, validator_private_key);
     let mut blockchain = BlockChain::new(validator_public_key, UnspentOutput::new(&pub_key_str, 100));
 
+    if let Some(remote_validator) = remote_validator_opt {
+        send_on_boarding_request(&mut configuration, &host, port, remote_validator, validator_public_key)?;
+    }
+
     loop {
         let (mut stream, addr) = listener.accept()?;
         println!("New connection opened");
@@ -29,6 +33,21 @@ pub fn run_node(host: String, port: u16, root_public_key: &str) -> Result<()> {
         let request = receive_and_parse(&mut stream)?;
         handle_request(&request, &mut stream, &mut blockchain, &mut configuration)?
     }
+}
+
+/**
+ * Sends onboarding request to another validator to build a network of validator nodes
+ */
+pub fn send_on_boarding_request(configuration: &mut Configuration, ip: &str, port: u16, remote_validator_address: &str, public_key: &PublicKeyStr) -> Result<()> {
+    let client = Client::new(remote_validator_address);
+    let response = client.register_validator(&format!("{}:{}", ip, port), public_key, false)?;
+    
+    // extending the list of known validators
+    configuration.validators.extend(response.iter().map(|v| (PublicKeyStr::from_str(&v.public_key), ValidatorAddress(v.address.to_owned()))));
+
+    println!("Validators added: {:?}", configuration.validators.iter().map(|validator| &validator.1).collect::<Vec<&ValidatorAddress>>());
+
+    Ok(())
 }
 
 /**

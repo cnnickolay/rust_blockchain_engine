@@ -1,15 +1,17 @@
+use std::thread;
+
 use protocol::{
     external::{ExternalRequest, ExternalResponse, UserCommand, UserCommandResponse},
-    internal::{CommandResponse, InternalRequest, InternalResponse, CommandRequest}, response::Response::Internal,
+    internal::{CommandResponse, InternalRequest, InternalResponse, CommandRequest, Validator},
 };
 use serde::Serialize;
 
 use crate::{
     configuration::{Configuration, ValidatorAddress},
     encryption::generate_rsa_key_pair,
-    model::{HexString, PublicKeyStr, Signature}, blockchain::{blockchain::BlockChain, transaction::Transaction, balanced_transaction::BalancedTransaction, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor}, client::send_bytes,
+    model::{HexString, PublicKeyStr}, blockchain::{blockchain::BlockChain, transaction::Transaction, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor}, client::Client,
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 pub trait RequestHandler<T: Serialize> {
     type RESPONSE;
@@ -28,16 +30,39 @@ impl RequestHandler<InternalResponse> for InternalRequest {
         configuration: &mut Configuration,
     ) -> Result<Self::RESPONSE> {
         match &self.command {
-            protocol::internal::CommandRequest::OnBoardValidator { return_address } => {
+            protocol::internal::CommandRequest::OnBoardValidator { return_address, public_key, retransmitted } => {
+
+                // to avoid infinite loop (seek for better solution :-/)
+                if !retransmitted {
+                    for (validator_pub_key, validator_addr) in &configuration.validators {
+                        let return_address_ = return_address.clone();
+                        let validator_addr_ = validator_addr.clone();
+                        let public_key_ = public_key.clone();
+                        thread::spawn(move || {
+                            let client = Client::new(&validator_addr_.0);
+                            client.register_validator(&return_address_, &PublicKeyStr::from_str(&public_key_), true).unwrap()
+                        });
+                    }
+                }
+
                 let validator_address = ValidatorAddress(return_address.to_owned());
-                configuration.validators.push(validator_address);
+                configuration.validators.insert((PublicKeyStr::from_str(&public_key), validator_address));
                 println!(
                     "Added new validator {:?}, total validators {}",
                     return_address,
                     &configuration.validators.len()
                 );
 
-                let all_validators = configuration.validators.iter().map(|addr| addr.0.clone()).collect();
+                let mut all_validators: Vec<Validator> = 
+                    configuration.validators.iter()
+                    .map(|(public_key, addr)| {
+                        Validator { public_key: public_key.0.0.to_owned(), address: addr.0.clone()}
+                    })
+                    .collect();
+                all_validators.push(Validator { 
+                    address: format!("{}:{}", configuration.ip, configuration.port), 
+                    public_key: configuration.public_key()?.0.0 
+                });
 
                 Ok(InternalResponse::Success {
                     request_id: self.request_id.to_owned(),

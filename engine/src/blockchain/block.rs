@@ -6,6 +6,7 @@ use crate::model::{Signature, PublicKeyStr, PrivateKeyStr};
 
 use super::{signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor};
 
+#[derive(Clone)]
 pub struct Block {
     /**
      * Hash of this block computation is based on hash of the previous block on blockchain plus hash of the transaction
@@ -17,7 +18,7 @@ pub struct Block {
      * Entire block with block hash and transaction hash is signed by validator's private key
      * To resolve contention between validators. 
      */
-    pub verifier_signatures: Vec<(PublicKeyStr, Signature)>
+    pub validator_signatures: Vec<(PublicKeyStr, Signature)>
 }
 
 impl Block {
@@ -29,13 +30,13 @@ impl Block {
 
         let private_key = RsaPrivateKey::try_from(validator_private_key)?;
         let transaction_cbor = hex::decode(Cbor::try_from(transaction)?.0)?;
-        let verifier_signature = Signature::sign(&private_key, &transaction_cbor)?;
+        let validator_signature = Signature::sign(&private_key, &transaction_cbor)?;
         let public_key = PublicKeyStr::try_from(&private_key.to_public_key())?;
 
         Ok(Block {
             hash: next_block_hash, 
             transaction: transaction.clone(), 
-            verifier_signatures: vec![(public_key, verifier_signature)]
+            validator_signatures: vec![(public_key, validator_signature)]
         })
     }
 

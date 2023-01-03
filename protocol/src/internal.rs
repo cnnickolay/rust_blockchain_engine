@@ -21,7 +21,9 @@ pub enum InternalResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CommandRequest {
     OnBoardValidator {
+        public_key: String,
         return_address: String,
+        retransmitted: bool
     },
     ValidateAndCommitTransaction {
         from: String,
@@ -41,7 +43,7 @@ pub enum CommandRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CommandResponse {
     OnBoardValidatorResponse {
-        validators: Vec<String>
+        validators: Vec<Validator>
     },
     ValidateAndCommitTransactionResponse,
     CommitTransactionResponse {
@@ -53,12 +55,20 @@ pub enum CommandResponse {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Validator {
+    pub address: String,
+    pub public_key: String
+}
+
 // ################
 
 impl CommandRequest {
-    pub fn new_on_board_command(return_address: &str) -> CommandRequest {
+    pub fn new_on_board_command(return_address: &str, public_key: &str, retransmitted: bool) -> CommandRequest {
         CommandRequest::OnBoardValidator {
-            return_address: return_address.to_string(),
+            return_address: return_address.to_owned(),
+            public_key: public_key.to_owned(),
+            retransmitted
         }
     }
 
