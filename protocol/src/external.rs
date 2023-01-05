@@ -35,6 +35,44 @@ pub enum UserCommand {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub enum UserCommandResponse {
+    PingCommandResponse {
+        request_id: String,
+        msg: String,
+    },
+    GenerateWalletResponse {
+        private_key: String,
+        public_key: String,
+    },
+    PrintBalancesResponse {
+        balances: Vec<(String, u64)>,
+    },
+    BalanceTransactionResponse {
+        request_id: String,
+        body: String,
+        cbor: String,
+    },
+    CommitTransactionResponse {
+        blockchain_hash: String,
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ExternalResponse {
+    Success(UserCommandResponse),
+    Error { msg: String },
+}
+
+impl ExternalResponse {
+    pub fn success(&self) -> Option<&UserCommandResponse> {
+        match self {
+            ExternalResponse::Success(r) => Some(r),
+            _ => None
+        }
+    }
+}
+
 impl UserCommand {
     pub fn new_ping(msg: &str) -> UserCommand {
         UserCommand::PingCommand {
@@ -58,43 +96,5 @@ impl UserCommand {
 
     pub fn to_request(self) -> Request {
         Request::External(ExternalRequest::new(self))
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub enum UserCommandResponse {
-    PingCommandResponse {
-        request_id: String,
-        msg: String,
-    },
-    GenerateWalletResponse {
-        private_key: String,
-        public_key: String,
-    },
-    PrintBalancesResponse {
-        balances: Vec<(String, u64)>,
-    },
-    BalanceTransactionResponse {
-        request_id: String,
-        body: String,
-        cbor: String,
-    },
-    CommitTransactionResponse {
-        transaction_id: String,
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub enum ExternalResponse {
-    Success(UserCommandResponse),
-    Error { msg: String },
-}
-
-impl ExternalResponse {
-    pub fn success(&self) -> Option<&UserCommandResponse> {
-        match self {
-            ExternalResponse::Success(r) => Some(r),
-            _ => None
-        }
     }
 }

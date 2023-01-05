@@ -8,7 +8,6 @@ use anyhow::{Result, anyhow};
 use rsa::RsaPublicKey;
 
 pub struct BlockChain {
-    pub validator_public_key: PublicKeyStr,
     pub initial_utxo: UnspentOutput,
     pub blocks: Vec<Block>,
 }
@@ -16,7 +15,6 @@ pub struct BlockChain {
 impl BlockChain {
     pub fn new(validator_public_key: &PublicKeyStr, initial_utxo: UnspentOutput) -> Self {
         Self {
-            validator_public_key: validator_public_key.clone(),
             initial_utxo,
             blocks: vec![],
         }
@@ -24,7 +22,6 @@ impl BlockChain {
 
     pub fn new_testing_only(validator_public_key: &PublicKeyStr, initial_utxo: UnspentOutput, blocks: Vec<Block>) -> Self {
         Self {
-            validator_public_key: validator_public_key.clone(),
             initial_utxo,
             blocks,
         }

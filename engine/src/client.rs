@@ -1,8 +1,9 @@
-use std::{net::TcpStream, io::Write};
+use std::{net::TcpStream, io::Write, thread};
 
 use anyhow::{Result, anyhow};
-use protocol::{request::Request, response::Response, external::{UserCommand, ExternalResponse, UserCommandResponse}, internal::{self, InternalResponse, CommandResponse, Validator}};
+use protocol::{request::Request, response::Response, external::{UserCommand, ExternalResponse, UserCommandResponse}, internal::{self, InternalResponse, CommandResponse, Validator, CommandRequest, ValidatorSignature}};
 use rsa::RsaPrivateKey;
+use serde::__private::de;
 
 use crate::{model::{PublicKeyStr, PrivateKeyStr}, blockchain::{transaction::Transaction, cbor::Cbor, balanced_transaction::BalancedTransaction}};
 
@@ -47,6 +48,25 @@ impl Client {
         let signed_cbor: Cbor = (&signed_transaction).try_into()?;
     
         send_bytes(&self.destination, UserCommand::new_commit_transaction(&signed_cbor.0).to_request())
+    }
+
+    pub fn request_transaction_validation(&self, 
+                                 blockchain_previous_tip: &str, 
+                                 blockchain_new_tip: &str, 
+                                 transaction_cbor: &str, 
+                                 validator_signature: &ValidatorSignature) -> () {
+        let command = CommandRequest::RequestTransactionValidation {
+            blockchain_previous_tip: blockchain_previous_tip.to_owned(),
+            blockchain_new_tip: blockchain_new_tip.to_owned(),
+            transaction_cbor: transaction_cbor.to_owned(),
+            validator_signature: validator_signature.clone(),
+        };
+        let destination = self.destination.to_owned();
+
+        thread::spawn(move || {
+            let response = send_bytes(&destination, command.to_request());
+            println!("{:?}", response);
+        });
     }
 }
 

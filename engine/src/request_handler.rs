@@ -2,7 +2,7 @@ use std::thread;
 
 use protocol::{
     external::{ExternalRequest, ExternalResponse, UserCommand, UserCommandResponse},
-    internal::{CommandResponse, InternalRequest, InternalResponse, CommandRequest, Validator},
+    internal::{CommandResponse, InternalRequest, InternalResponse, CommandRequest, Validator, ValidatorSignature},
 };
 use serde::Serialize;
 
@@ -11,7 +11,7 @@ use crate::{
     encryption::generate_rsa_key_pair,
     model::{HexString, PublicKeyStr}, blockchain::{blockchain::BlockChain, transaction::Transaction, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor}, client::Client,
 };
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 pub trait RequestHandler<T: Serialize> {
     type RESPONSE;
@@ -46,7 +46,7 @@ impl RequestHandler<InternalResponse> for InternalRequest {
                 }
 
                 let validator_address = ValidatorAddress(return_address.to_owned());
-                configuration.validators.insert((PublicKeyStr::from_str(&public_key), validator_address));
+                configuration.add_validators(&[(PublicKeyStr::from_str(&public_key), validator_address)]);
                 println!(
                     "Added new validator {:?}, total validators {}",
                     return_address,
@@ -61,7 +61,7 @@ impl RequestHandler<InternalResponse> for InternalRequest {
                     .collect();
                 all_validators.push(Validator { 
                     address: format!("{}:{}", configuration.ip, configuration.port), 
-                    public_key: configuration.public_key()?.0.0 
+                    public_key: configuration.validator_public_key.0.0.to_owned()
                 });
 
                 Ok(InternalResponse::Success {
@@ -69,28 +69,34 @@ impl RequestHandler<InternalResponse> for InternalRequest {
                     response: CommandResponse::OnBoardValidatorResponse { validators: all_validators },
                 })
             },
-            protocol::internal::CommandRequest::ValidateAndCommitTransaction {
-                from,
-                to,
-                amount,
-                signature,
-            } => {
-                Ok(InternalResponse::Success {
-                    request_id: self.request_id.to_owned(),
-                    response: CommandResponse::ValidateAndCommitTransactionResponse,
-                })
-            },
-            protocol::internal::CommandRequest::CommitTransaction { signed_transaction_cbor } => {
-                let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&signed_transaction_cbor))?;
-                signed_transaction.commit(blockchain, &configuration.validator_private_key)?;
+            CommandRequest::SynchronizeBlockchain { address, blockchain_hash } => todo!(),
+            CommandRequest::RequestTransactionValidation { blockchain_previous_tip, blockchain_new_tip, transaction_cbor, validator_signature } => {
                 let blockchain_hash = blockchain.blockchain_hash()?;
+                if *blockchain_previous_tip != blockchain.blockchain_hash()? {
+                    return Ok(InternalResponse::Error { msg: format!("Transaction can't be applied for blockchains are not in sync: {} != {}", blockchain_previous_tip, blockchain_hash) });
+                }
+
+                let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&transaction_cbor))?;
+                let block = signed_transaction.commit(blockchain, &configuration.validator_private_key)?;
+                let blockchain_hash = blockchain.blockchain_hash()?;
+                let (_, signature) = block.validator_signatures.first().ok_or(anyhow!("Transaction wasn't signed by validator"))?;
+
+                if *blockchain_new_tip != block.hash {
+                    return Ok(InternalResponse::Error { msg: "Blockchain has is different. Possibility of hard fork".to_owned() })
+                }
+
+                println!("Transaction successfully verified and added to blockchain. Total verifications: {}", block.validator_signatures.len());
 
                 Ok(InternalResponse::Success {
                     request_id: self.request_id.to_owned(),
-                    response: CommandResponse::CommitTransactionResponse { blockchain_hash },
+                    response: CommandResponse::RequestTransactionValidationResponse {
+                        new_blockchain_tip: blockchain_hash,
+                        validator_public_key: configuration.validator_public_key.0.0.to_owned(),
+                        transaction_cbor: transaction_cbor.to_owned(),
+                        validator_signature: signature.0.0.to_owned(),
+                    },
                 })
             },
-            CommandRequest::SynchronizeBlockchain { address, blockchain_hash } => todo!(),
         }
     }
 }
@@ -156,9 +162,24 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
             },
 
             UserCommand::CommitTransaction { signed_transaction_cbor } => {
+                let blockchain_previous_tip = blockchain.blockchain_hash()?;
+                let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&signed_transaction_cbor))?;
+                let block = signed_transaction.commit(blockchain, &configuration.validator_private_key)?;
+                let (_, validator_signature) = block.validator_signatures.first().unwrap();
+
+                if let Some((_, validator_address)) = configuration.validators.first() {
+                    let client = Client::new(&validator_address.0);
+                    client.request_transaction_validation(
+                                &blockchain_previous_tip, &block.hash, 
+                                        signed_transaction_cbor, 
+                                        &ValidatorSignature {
+                                            validator: Validator { address: configuration.address(), public_key: configuration.validator_public_key.0.0.to_owned() },
+                                            signature: validator_signature.0.0.to_owned(),
+                                        })
+                }
 
                 Ok(ExternalResponse::Success(
-                    UserCommandResponse::CommitTransactionResponse { transaction_id: "".to_owned() },
+                    UserCommandResponse::CommitTransactionResponse { blockchain_hash: block.hash.to_owned() },
                 ))
             },
         }

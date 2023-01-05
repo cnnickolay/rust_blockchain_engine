@@ -37,7 +37,8 @@ mod tests {
             .sign(&priv_2.try_into().unwrap())
             .unwrap()
             .commit(&mut blockchain, validator_private_key)
-            .unwrap();
+            .unwrap()
+            .transaction;
 
         assert_eq!(blockchain.blocks.len(), 2, "Number of transactions is wrong");
         
@@ -67,7 +68,8 @@ mod tests {
             .sign(&priv_1.try_into().unwrap())
             .unwrap()
             .commit(&mut blockchain, validator_private_key)
-            .unwrap();
+            .unwrap()
+            .transaction;
 
         assert_eq!(blockchain.blocks.len(), 4, "Number of transactions is wrong");
 
