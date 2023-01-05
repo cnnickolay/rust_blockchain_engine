@@ -1,5 +1,5 @@
 # Blockchain engine
-Naive implementation of blockchain engine on Rust.
+Implementation of a custom cryptocurrency on Rust.
 
 # What's implemented as of 2 January 2023
 UTxO model is implemented, transactions balancing, signing, submitting.
