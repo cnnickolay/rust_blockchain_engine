@@ -4,7 +4,7 @@ use rsa::RsaPrivateKey;
 
 use crate::model::{PrivateKeyStr, PublicKeyStr};
 
-type ValidatorPublicKeyAndAddress = (PublicKeyStr, ValidatorAddress);
+pub type ValidatorPublicKeyAndAddress = (PublicKeyStr, ValidatorAddress);
 
 /**
  * A runtime configuration for current node

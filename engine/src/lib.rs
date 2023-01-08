@@ -10,5 +10,6 @@ pub mod configuration;
 pub mod encryption;
 pub mod blockchain;
 pub mod utils;
+pub mod response_handlers;
 
 pub use engine::run_node;

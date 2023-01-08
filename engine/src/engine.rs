@@ -1,14 +1,14 @@
 use crate::{
-    configuration::{Configuration, ValidatorAddress},
+    configuration::{Configuration, ValidatorAddress, ValidatorPublicKeyAndAddress},
     model::PublicKeyStr,
-    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}, client::Client,
+    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}, client::{Client, send_bytes}, response_handlers::handle_response,
 };
 use anyhow::Result;
 use protocol::{request::Request, response::Response, internal::InternalResponse, external::ExternalResponse};
 use rsa::RsaPublicKey;
 use std::{
     io::{Read, Write},
-    net::{TcpListener, TcpStream}, sync::{Mutex, Arc},
+    net::{TcpListener, TcpStream}, sync::{Mutex, Arc}, thread,
 };
 
 pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator_opt: Option<&str>) -> Result<()> {
@@ -32,7 +32,17 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
         println!("New connection opened");
 
         let request = receive_and_parse(&mut stream)?;
-        handle_request(&request, &mut stream, blockchain.clone(), &mut configuration)?
+        let (response, following_requests) = handle_request(&request, blockchain.clone(), &mut configuration)?;
+
+        let bytes = serde_cbor::to_vec(&response)?;
+        stream.write(&bytes)?;
+    
+        for ((_, addr), request) in following_requests {
+            let blockchain = blockchain.clone();
+            println!("Sending a following request");
+            let response = send_bytes(&addr.0, request).unwrap();
+            handle_response(&blockchain, response).unwrap();
+        }
     }
 }
 
@@ -72,28 +82,25 @@ fn receive_and_parse(stream: &mut TcpStream) -> Result<Request> {
  */
 pub fn handle_request(
     request: &Request,
-    stream: &mut TcpStream,
     blockchain: Arc<Mutex<BlockChain>>,
     configuration: &mut Configuration,
-) -> Result<()> {
+) -> Result<(Response, Vec<(ValidatorPublicKeyAndAddress, Request)>)> {
     println!("Received request: {:?}", request);
     let response = match request {
         Request::Internal(req) => {
             match req.handle_request(blockchain, configuration) {
-                Ok(result) => Response::Internal(result),
-                Err(err) => Response::Internal(InternalResponse::Error { msg: format!("{:?}", err) }),
+                Ok((response, following_requests)) => (Response::Internal(response), following_requests),
+                Err(err) => (Response::Internal(InternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
             }
             
         }
         Request::External(req) => {
             match req.handle_request(blockchain, configuration) {
-                Ok(result) => Response::External(result),
-                Err(err) => Response::External(ExternalResponse::Error { msg: format!("{:?}", err) }),
+                Ok((result, following_requests)) => (Response::External(result), following_requests),
+                Err(err) => (Response::External(ExternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
             }
         }
     };
 
-    let bytes = serde_cbor::to_vec(&response)?;
-    stream.write(&bytes)?;
-    Ok(())
+    Ok(response)
 }
