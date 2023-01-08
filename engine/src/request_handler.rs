@@ -1,4 +1,4 @@
-use std::thread;
+use std::{thread, sync::{Mutex, Arc}};
 
 use protocol::{
     external::{ExternalRequest, ExternalResponse, UserCommand, UserCommandResponse},
@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::{
     configuration::{Configuration, ValidatorAddress},
     encryption::generate_rsa_key_pair,
-    model::{HexString, PublicKeyStr}, blockchain::{blockchain::BlockChain, transaction::Transaction, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor}, client::Client,
+    model::{HexString, PublicKeyStr}, blockchain::{blockchain::BlockChain, transaction::Transaction, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor, block::Block}, client::Client, utils::shorten_long_string,
 };
 use anyhow::{Result, anyhow};
 
@@ -17,7 +17,7 @@ pub trait RequestHandler<T: Serialize> {
     type RESPONSE;
     fn handle_request(
         &self,
-        blockchain: &mut BlockChain,
+        blockchain: Arc<Mutex<BlockChain>>,
         configuration: &mut Configuration,
     ) -> Result<Self::RESPONSE>;
 }
@@ -26,7 +26,7 @@ impl RequestHandler<InternalResponse> for InternalRequest {
     type RESPONSE = InternalResponse;
     fn handle_request(
         &self,
-        blockchain: &mut BlockChain,
+        blockchain: Arc<Mutex<BlockChain>>,
         configuration: &mut Configuration,
     ) -> Result<Self::RESPONSE> {
         match &self.command {
@@ -71,21 +71,26 @@ impl RequestHandler<InternalResponse> for InternalRequest {
             },
             CommandRequest::SynchronizeBlockchain { address, blockchain_hash } => todo!(),
             CommandRequest::RequestTransactionValidation { blockchain_previous_tip, blockchain_new_tip, transaction_cbor, validator_signature } => {
-                let blockchain_hash = blockchain.blockchain_hash()?;
-                if *blockchain_previous_tip != blockchain.blockchain_hash()? {
-                    return Ok(InternalResponse::Error { msg: format!("Transaction can't be applied for blockchains are not in sync: {} != {}", blockchain_previous_tip, blockchain_hash) });
+                let blockchain_hash = blockchain.lock().unwrap().blockchain_hash()? ;
+                if *blockchain_previous_tip != blockchain_hash {
+                    let msg = format!("Transaction can't be applied for blockchains are not in sync: {} != {}", blockchain_previous_tip, blockchain_hash);
+                    println!("{}", msg);
+                    return Ok(InternalResponse::Error { msg });
                 }
 
                 let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&transaction_cbor))?;
-                let block = signed_transaction.commit(blockchain, &configuration.validator_private_key)?;
-                let blockchain_hash = blockchain.blockchain_hash()?;
-                let (_, signature) = block.validator_signatures.first().ok_or(anyhow!("Transaction wasn't signed by validator"))?;
+                let block = signed_transaction.commit(&blockchain, &configuration.validator_private_key)?;
+                let blockchain_hash = blockchain.lock().unwrap().blockchain_hash()?;
+                let validator_signature = block.validator_signatures.first().ok_or(anyhow!("Transaction wasn't signed by validator"))?;
 
                 if *blockchain_new_tip != block.hash {
-                    return Ok(InternalResponse::Error { msg: "Blockchain has is different. Possibility of hard fork".to_owned() })
+                    let msg = format!("Blockchain hash is different. Possibility of a hard fork");
+                    println!("{}", msg);
+                    return Ok(InternalResponse::Error { msg })
                 }
 
                 println!("Transaction successfully verified and added to blockchain. Total verifications: {}", block.validator_signatures.len());
+                println!("{}", serde_json::to_string_pretty(&block)?);
 
                 Ok(InternalResponse::Success {
                     request_id: self.request_id.to_owned(),
@@ -93,7 +98,7 @@ impl RequestHandler<InternalResponse> for InternalRequest {
                         new_blockchain_tip: blockchain_hash,
                         validator_public_key: configuration.validator_public_key.0.0.to_owned(),
                         transaction_cbor: transaction_cbor.to_owned(),
-                        validator_signature: signature.0.0.to_owned(),
+                        validator_signature: validator_signature.validator_signature.0.0.to_owned(),
                     },
                 })
             },
@@ -105,7 +110,7 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
     type RESPONSE = ExternalResponse;
     fn handle_request(
         &self,
-        blockchain: &mut BlockChain,
+        blockchain: Arc<Mutex<BlockChain>>,
         configuration: &mut Configuration,
     ) -> Result<Self::RESPONSE> {
         println!("External request received");
@@ -130,28 +135,25 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
                 ))
             },
             UserCommand::PrintBalances => {
-                let shorten_public_address = |str: &str| {
-                    let mut res = String::new();
-                    res += &str[0..10];
-                    res += "....";
-                    res += &str[str.len() - 10..str.len()];
-                    res.to_string()
-                };
-
-                let balances = Vec::from_iter(
-                    blockchain
-                        .all_balances()
-                        .iter()
-                        .map(|(k, v)| (shorten_public_address(&k.0 .0), v.clone())),
-                );
-
-                Ok(ExternalResponse::Success(
-                    UserCommandResponse::PrintBalancesResponse { balances },
-                ))
+                if let Ok(blockchain) = blockchain.lock() {
+                    let balances: Vec<_> = Vec::from_iter(
+                        blockchain
+                            .all_balances()
+                            .iter()
+                            .map(|(k, v)| (shorten_long_string(&k.0 .0), v.clone())),
+                    );
+    
+                    Ok(ExternalResponse::Success(
+                        UserCommandResponse::PrintBalancesResponse { balances },
+                    ))
+                } else {
+                    todo!()
+                }
             },
             
             UserCommand::BalanceTransaction { from, to, amount } => {
-                let balanced_transaction = &Transaction::new(&PublicKeyStr::from_str(from), &PublicKeyStr::from_str(to), *amount).balance_transaction(blockchain)?;
+                let balanced_transaction = &Transaction::new(&PublicKeyStr::from_str(from), &PublicKeyStr::from_str(to), *amount)
+                    .balance_transaction(&blockchain)?;
                 let cbor_bytes = balanced_transaction.to_cbor()?;
                 let cbor = hex::encode(&cbor_bytes);
                 let body = serde_json::to_string_pretty(balanced_transaction)?;
@@ -162,24 +164,43 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
             },
 
             UserCommand::CommitTransaction { signed_transaction_cbor } => {
-                let blockchain_previous_tip = blockchain.blockchain_hash()?;
+                let blockchain_previous_tip = blockchain.lock().unwrap().blockchain_hash()?;
                 let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&signed_transaction_cbor))?;
-                let block = signed_transaction.commit(blockchain, &configuration.validator_private_key)?;
-                let (_, validator_signature) = block.validator_signatures.first().unwrap();
+                let block = signed_transaction.commit(&blockchain, &configuration.validator_private_key)?;
+                let validator_signature = block.validator_signatures.first().unwrap();
 
-                if let Some((_, validator_address)) = configuration.validators.first() {
+                // if let Some((_, validator_address)) = configuration.validators.first() {
+                for (_, validator_address) in &configuration.validators {
                     let client = Client::new(&validator_address.0);
                     client.request_transaction_validation(
-                                &blockchain_previous_tip, &block.hash, 
-                                        signed_transaction_cbor, 
-                                        &ValidatorSignature {
-                                            validator: Validator { address: configuration.address(), public_key: configuration.validator_public_key.0.0.to_owned() },
-                                            signature: validator_signature.0.0.to_owned(),
-                                        })
+                        blockchain.clone(), 
+                        &blockchain_previous_tip,
+                        &block.hash, 
+                        signed_transaction_cbor, 
+                        &ValidatorSignature { 
+                            validator: Validator { 
+                                address: configuration.address(), 
+                                public_key: configuration.validator_public_key.0.0.to_owned() 
+                            }, 
+                            signature: validator_signature.validator_signature.0.0.to_owned() 
+                        });
                 }
+
+                println!("{}", serde_json::to_string_pretty(&block)?);
 
                 Ok(ExternalResponse::Success(
                     UserCommandResponse::CommitTransactionResponse { blockchain_hash: block.hash.to_owned() },
+                ))
+            },
+            UserCommand::PrintBlockchain => {
+                let blockchain = blockchain.lock().unwrap();
+                let blocks = blockchain.blocks.iter().map(|block| {
+                    let block_str = String::new();
+                    
+                    block_str
+                }).collect();
+                Ok(ExternalResponse::Success(
+                    UserCommandResponse::PrintBlockchainResponse { blocks },
                 ))
             },
         }

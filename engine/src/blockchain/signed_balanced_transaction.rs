@@ -1,3 +1,5 @@
+use std::sync::{Mutex, Arc};
+
 use crate::model::{Signature, PublicKeyStr, PrivateKeyStr};
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
@@ -71,8 +73,8 @@ impl SignedBalancedTransaction {
         }
     }
 
-    pub fn commit(&self, blockchain: &mut BlockChain, validator_private_key: &PrivateKeyStr) -> Result<Block> {
-        let block = blockchain.commit_transaction(self, validator_private_key)?;
+    pub fn commit(&self, blockchain: &Arc<Mutex<BlockChain>>, validator_private_key: &PrivateKeyStr) -> Result<Block> {
+        let block = blockchain.lock().unwrap().commit_transaction(self, validator_private_key)?;
         Ok(block)
     }
 

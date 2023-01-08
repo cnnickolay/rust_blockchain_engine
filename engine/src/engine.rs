@@ -8,7 +8,7 @@ use protocol::{request::Request, response::Response, internal::InternalResponse,
 use rsa::RsaPublicKey;
 use std::{
     io::{Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{TcpListener, TcpStream}, sync::{Mutex, Arc},
 };
 
 pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator_opt: Option<&str>) -> Result<()> {
@@ -20,7 +20,8 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
     let (validator_private_key, validator_public_key) = &generate_rsa_keypair_custom()?;
 
     let mut configuration = Configuration::new(&host, port, validator_private_key);
-    let mut blockchain = BlockChain::new(validator_public_key, UnspentOutput::initial_utxo(&pub_key_str, 100));
+    let blockchain = BlockChain::new(validator_public_key, UnspentOutput::initial_utxo(&pub_key_str, 100));
+    let blockchain = Arc::new(Mutex::new(blockchain));
 
     if let Some(remote_validator) = remote_validator_opt {
         send_on_boarding_request(&mut configuration, &host, port, remote_validator, validator_public_key)?;
@@ -31,7 +32,7 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
         println!("New connection opened");
 
         let request = receive_and_parse(&mut stream)?;
-        handle_request(&request, &mut stream, &mut blockchain, &mut configuration)?
+        handle_request(&request, &mut stream, blockchain.clone(), &mut configuration)?
     }
 }
 
@@ -72,7 +73,7 @@ fn receive_and_parse(stream: &mut TcpStream) -> Result<Request> {
 pub fn handle_request(
     request: &Request,
     stream: &mut TcpStream,
-    blockchain: &mut BlockChain,
+    blockchain: Arc<Mutex<BlockChain>>,
     configuration: &mut Configuration,
 ) -> Result<()> {
     println!("Received request: {:?}", request);

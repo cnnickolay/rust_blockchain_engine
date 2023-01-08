@@ -1,12 +1,13 @@
 use rsa::RsaPrivateKey;
+use serde::Serialize;
 use sha1::Digest;
 use sha2::Sha256;
 use anyhow::Result;
 use crate::model::{Signature, PublicKeyStr, PrivateKeyStr};
 
-use super::{signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor};
+use super::{signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor, validator_signature::ValidatorSignature};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Block {
     /**
      * Hash of this block computation is based on hash of the previous block on blockchain plus hash of the transaction
@@ -18,7 +19,7 @@ pub struct Block {
      * Entire block with block hash and transaction hash is signed by validator's private key
      * To resolve contention between validators. 
      */
-    pub validator_signatures: Vec<(PublicKeyStr, Signature)>
+    pub validator_signatures: Vec<ValidatorSignature>
 }
 
 impl Block {
@@ -36,7 +37,7 @@ impl Block {
         Ok(Block {
             hash: next_block_hash, 
             transaction: transaction.clone(), 
-            validator_signatures: vec![(public_key, validator_signature)]
+            validator_signatures: vec![ValidatorSignature::new(&public_key, &validator_signature)]
         })
     }
 

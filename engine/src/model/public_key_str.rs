@@ -3,11 +3,19 @@ use std::fmt::{Display, Formatter};
 use rsa::{RsaPublicKey, pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey}};
 use serde::{Serialize, Deserialize};
 
+use crate::utils::shorten_long_string;
+
 use super::hex_string::HexString;
 
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct PublicKeyStr(pub HexString);
+
+impl Display for PublicKeyStr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", shorten_long_string(&self.0.0))
+    }
+}
 
 impl PublicKeyStr {
     pub fn from_str(str: &str) -> Self {
@@ -31,11 +39,5 @@ impl TryFrom<&RsaPublicKey> for PublicKeyStr {
     fn try_from(key: &RsaPublicKey) -> Result<Self, Self::Error> {
         let key_str = hex::encode(key.to_pkcs1_der()?);
         Ok(PublicKeyStr(HexString(key_str)))
-    }
-}
-
-impl Display for PublicKeyStr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.0)
     }
 }

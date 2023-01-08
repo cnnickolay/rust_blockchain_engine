@@ -32,7 +32,8 @@ pub enum UserCommand {
     },
     CommitTransaction {
         signed_transaction_cbor: String,
-    }
+    },
+    PrintBlockchain
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -55,6 +56,9 @@ pub enum UserCommandResponse {
     },
     CommitTransactionResponse {
         blockchain_hash: String,
+    },
+    PrintBlockchainResponse {
+        blocks: Vec<String>
     }
 }
 

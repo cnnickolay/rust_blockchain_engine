@@ -1,11 +1,10 @@
-use std::{net::TcpStream, io::Write, thread};
+use std::{net::TcpStream, io::Write, thread, sync::{Arc, Mutex}};
 
 use anyhow::{Result, anyhow};
-use protocol::{request::Request, response::Response, external::{UserCommand, ExternalResponse, UserCommandResponse}, internal::{self, InternalResponse, CommandResponse, Validator, CommandRequest, ValidatorSignature}};
+use protocol::{request::Request, response::Response, external::{UserCommand}, internal::{self, InternalResponse, CommandResponse, Validator, CommandRequest, ValidatorSignature}};
 use rsa::RsaPrivateKey;
-use serde::__private::de;
 
-use crate::{model::{PublicKeyStr, PrivateKeyStr}, blockchain::{transaction::Transaction, cbor::Cbor, balanced_transaction::BalancedTransaction}};
+use crate::{model::{PublicKeyStr, PrivateKeyStr, Signature}, blockchain::{cbor::Cbor, balanced_transaction::BalancedTransaction, blockchain::BlockChain, block}};
 
 pub struct Client {
     destination: String,
@@ -51,6 +50,7 @@ impl Client {
     }
 
     pub fn request_transaction_validation(&self, 
+                                 blockchain: Arc<Mutex<BlockChain>>,
                                  blockchain_previous_tip: &str, 
                                  blockchain_new_tip: &str, 
                                  transaction_cbor: &str, 
@@ -64,9 +64,24 @@ impl Client {
         let destination = self.destination.to_owned();
 
         thread::spawn(move || {
+            let err_msg = format!("Error happened when sending {}", serde_json::to_string_pretty(&command).unwrap());
             let response = send_bytes(&destination, command.to_request());
-            println!("{:?}", response);
+            match response {
+                Ok(Response::Internal(InternalResponse::Success { response: CommandResponse::RequestTransactionValidationResponse{validator_public_key, validator_signature, ..}, .. })) => {
+                    if let Ok(mut blockchain) = blockchain.lock() {
+                        let last = blockchain.blocks.last_mut().unwrap();
+                        last.validator_signatures.push(super::blockchain::validator_signature::ValidatorSignature::new(&PublicKeyStr::from_str(&validator_public_key), &Signature::from_string(&validator_signature)));
+                        println!("Validation added {}", serde_json::to_string_pretty(&last.validator_signatures).unwrap());
+                    }
+                }
+                Ok(Response::Internal(InternalResponse::Error {msg})) => println!("{}", err_msg),
+                _ => {}
+            }
         });
+    }
+
+    pub fn print_blockchain(&self) -> Result<Response> {
+        send_bytes(&self.destination, UserCommand::PrintBlockchain.to_request())
     }
 }
 

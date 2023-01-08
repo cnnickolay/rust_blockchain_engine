@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::{Mutex, Arc}};
 
 use crate::model::PublicKeyStr;
 use anyhow::{Result, anyhow};
@@ -17,7 +17,8 @@ impl Transaction {
         Transaction { from: from.clone(), to: to.clone(), amount }
     }
 
-    pub fn balance_transaction(&self, blockchain: &BlockChain) -> Result<BalancedTransaction> {
+    pub fn balance_transaction(&self, blockchain: &Arc<Mutex<BlockChain>>) -> Result<BalancedTransaction> {
+        let blockchain = blockchain.lock().unwrap();
         let mut unspent_utxos = HashSet::new();
         if self.from == blockchain.initial_utxo.address {
             unspent_utxos.insert(blockchain.initial_utxo.clone());
