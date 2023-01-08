@@ -8,7 +8,7 @@ use protocol::{request::Request, response::Response, internal::InternalResponse,
 use rsa::RsaPublicKey;
 use std::{
     io::{Read, Write},
-    net::{TcpListener, TcpStream}, sync::{Mutex, Arc}, thread,
+    net::{TcpListener, TcpStream}, sync::{Mutex, Arc},
 };
 
 pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator_opt: Option<&str>) -> Result<()> {
@@ -27,6 +27,8 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
         send_on_boarding_request(&mut configuration, &host, port, remote_validator, validator_public_key)?;
     }
 
+    // let mut triggered_requests = Vec::new();
+
     loop {
         let (mut stream, addr) = listener.accept()?;
         println!("New connection opened");
@@ -36,7 +38,7 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
 
         let bytes = serde_cbor::to_vec(&response)?;
         stream.write(&bytes)?;
-    
+
         for ((_, addr), request) in following_requests {
             let blockchain = blockchain.clone();
             println!("Sending a following request");

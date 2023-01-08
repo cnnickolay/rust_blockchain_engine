@@ -49,37 +49,6 @@ impl Client {
         send_bytes(&self.destination, UserCommand::new_commit_transaction(&signed_cbor.0).to_request())
     }
 
-    pub fn request_transaction_validation(&self, 
-                                 blockchain: Arc<Mutex<BlockChain>>,
-                                 blockchain_previous_tip: &str, 
-                                 blockchain_new_tip: &str, 
-                                 transaction_cbor: &str, 
-                                 validator_signature: &ValidatorSignature) -> () {
-        let command = CommandRequest::RequestTransactionValidation {
-            blockchain_previous_tip: blockchain_previous_tip.to_owned(),
-            blockchain_new_tip: blockchain_new_tip.to_owned(),
-            transaction_cbor: transaction_cbor.to_owned(),
-            validator_signature: validator_signature.clone(),
-        };
-        let destination = self.destination.to_owned();
-
-        thread::spawn(move || {
-            let err_msg = format!("Error happened when sending {}", serde_json::to_string_pretty(&command).unwrap());
-            let response = send_bytes(&destination, command.to_request());
-            match response {
-                Ok(Response::Internal(InternalResponse::Success { response: CommandResponse::RequestTransactionValidationResponse{validator_public_key, validator_signature, ..}, .. })) => {
-                    if let Ok(mut blockchain) = blockchain.lock() {
-                        let last = blockchain.blocks.last_mut().unwrap();
-                        last.validator_signatures.push(super::blockchain::validator_signature::ValidatorSignature::new(&PublicKeyStr::from_str(&validator_public_key), &Signature::from_string(&validator_signature)));
-                        println!("Validation added {}", serde_json::to_string_pretty(&last.validator_signatures).unwrap());
-                    }
-                }
-                Ok(Response::Internal(InternalResponse::Error {msg})) => println!("{}", err_msg),
-                _ => {}
-            }
-        });
-    }
-
     pub fn print_blockchain(&self) -> Result<Response> {
         send_bytes(&self.destination, UserCommand::PrintBlockchain.to_request())
     }

@@ -174,27 +174,31 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
                 let block = signed_transaction.commit(&blockchain, &configuration.validator_private_key)?;
                 let validator_signature = block.validator_signatures.first().unwrap();
 
-                for (_, validator_address) in &configuration.validators {
-                    let client = Client::new(&validator_address.0);
-                    client.request_transaction_validation(
-                        blockchain.clone(), 
-                        &blockchain_previous_tip,
-                        &block.hash, 
-                        signed_transaction_cbor, 
-                        &ValidatorSignature {
+
+                let mut requests = Vec::new();
+
+                for validator in &configuration.validators {
+                    let request = CommandRequest::RequestTransactionValidation {
+                        blockchain_previous_tip: blockchain_previous_tip.to_owned(),
+                        blockchain_new_tip: block.hash.to_owned(),
+                        transaction_cbor: signed_transaction_cbor.to_owned(),
+                        validator_signature: ValidatorSignature {
                             validator: Validator {
                                 address: configuration.address(), 
                                 public_key: configuration.validator_public_key.0.0.to_owned()
                             },
                             signature: validator_signature.validator_signature.0.0.to_owned()
-                        });
+                        },
+                    }.to_request();
+
+                    requests.push((validator.clone(), request));
                 }
 
                 println!("{}", serde_json::to_string_pretty(&block)?);
 
-                Self::ok_no_requests(ExternalResponse::Success(
+                Self::ok_with_requests(ExternalResponse::Success(
                     UserCommandResponse::CommitTransactionResponse { blockchain_hash: block.hash.to_owned() },
-                ))
+                ), requests)
             },
             UserCommand::PrintBlockchain => {
                 let blockchain = blockchain.lock().unwrap();
