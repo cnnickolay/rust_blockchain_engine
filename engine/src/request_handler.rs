@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::{
     configuration::{Configuration, ValidatorAddress, ValidatorPublicKeyAndAddress},
     encryption::generate_rsa_key_pair,
-    model::{HexString, PublicKeyStr}, blockchain::{blockchain::BlockChain, transaction::Transaction, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor, block::Block}, client::Client, utils::shorten_long_string,
+    model::{HexString, PublicKeyStr}, blockchain::{blockchain::BlockChain, transaction::Transaction, signed_balanced_transaction::{SignedBalancedTransaction, self}, cbor::Cbor, block::Block}, client::Client, utils::shorten_long_string,
 };
 use anyhow::{Result, anyhow};
 
@@ -137,20 +137,16 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
                 ))
             },
             UserCommand::PrintBalances => {
-                if let Ok(blockchain) = blockchain.lock() {
-                    let balances: Vec<_> = Vec::from_iter(
-                        blockchain
+                let balances =
+                        blockchain.lock().unwrap()
                             .all_balances()
                             .iter()
-                            .map(|(k, v)| (shorten_long_string(&k.0 .0), v.clone())),
-                    );
-    
-                    Self::ok_no_requests(ExternalResponse::Success(
-                        UserCommandResponse::PrintBalancesResponse { balances },
-                    ))
-                } else {
-                    todo!()
-                }
+                            .map(|(k, v)| (shorten_long_string(&k.0 .0), v.clone()))
+                            .collect();
+
+                Self::ok_no_requests(ExternalResponse::Success(
+                    UserCommandResponse::PrintBalancesResponse { balances },
+                ))
             },
             
             UserCommand::BalanceTransaction { from, to, amount } => {
@@ -199,9 +195,29 @@ impl RequestHandler<ExternalResponse> for ExternalRequest {
             },
             UserCommand::PrintBlockchain => {
                 let blockchain = blockchain.lock().unwrap();
-                let blocks = blockchain.blocks.iter().map(|block| {
-                    let block_str = String::new();
-                    
+                let blocks = blockchain.blocks.iter().enumerate().map(|(idx, block)| {
+                    let mut block_str = String::new();
+                    block_str.push_str(&format!("{}. Block {}", idx + 1, block.hash));
+                    block_str.push_str("\n  Input UTxOs:");
+                    for (idx, input_utxo) in block.transaction.inputs().iter().enumerate() {
+                        block_str.push_str(&format!("\n    Input {}:", idx + 1));
+                        block_str.push_str(&format!("\n      Addr: {}", shorten_long_string(&input_utxo.address.0.0)));
+                        block_str.push_str(&format!("\n      Amount: {}", input_utxo.amount));
+                    }
+                    block_str.push_str("\n  Output UTxOs:");
+                    for (idx, output_utxo) in block.transaction.outputs().iter().enumerate() {
+                        block_str.push_str(&format!("\n    Output {}:", idx + 1));
+                        block_str.push_str(&format!("\n      Addr: {}", shorten_long_string(&output_utxo.address.0.0)));
+                        block_str.push_str(&format!("\n      Amount: {}", output_utxo.amount));
+                    }
+                    block_str.push_str(&format!("\n  Transaction signature: {}", shorten_long_string(&block.transaction.signature.0.0)));
+                    block_str.push_str(&format!("\n  Confirmations (total {}):", block.validator_signatures.len()));
+                    for (idx, signature) in block.validator_signatures.iter().enumerate() {
+                        block_str.push_str(&format!("\n    Confirmation {}:", idx + 1));
+                        block_str.push_str(&format!("\n      Validator Id: {}", shorten_long_string(&signature.validator_public_key.0.0)));
+                        block_str.push_str(&format!("\n      Signature: {}", shorten_long_string(&signature.validator_signature.0.0)));
+                    }
+
                     block_str
                 }).collect();
                 Self::ok_no_requests(ExternalResponse::Success(

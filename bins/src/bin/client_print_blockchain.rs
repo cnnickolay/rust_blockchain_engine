@@ -14,7 +14,7 @@ fn main() {
 fn client(args: &Args) -> Result<()> {
     let client = Client::new(&args.destination);
     let response = client.print_blockchain()?;
-    println!("{}", serde_json::to_string_pretty(&response)?);
+    println!("{}", response);
     Ok(())
 }
 

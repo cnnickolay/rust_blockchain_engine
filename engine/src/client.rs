@@ -1,10 +1,10 @@
-use std::{net::TcpStream, io::Write, thread, sync::{Arc, Mutex}};
+use std::{net::TcpStream, io::Write};
 
 use anyhow::{Result, anyhow};
-use protocol::{request::Request, response::Response, external::{UserCommand}, internal::{self, InternalResponse, CommandResponse, Validator, CommandRequest, ValidatorSignature}};
+use protocol::{request::Request, response::Response, external::{UserCommand, ExternalResponse, UserCommandResponse}, internal::{self, InternalResponse, CommandResponse, Validator}};
 use rsa::RsaPrivateKey;
 
-use crate::{model::{PublicKeyStr, PrivateKeyStr, Signature}, blockchain::{cbor::Cbor, balanced_transaction::BalancedTransaction, blockchain::BlockChain, block}};
+use crate::{model::{PublicKeyStr, PrivateKeyStr}, blockchain::{cbor::Cbor, balanced_transaction::BalancedTransaction}};
 
 pub struct Client {
     destination: String,
@@ -49,8 +49,13 @@ impl Client {
         send_bytes(&self.destination, UserCommand::new_commit_transaction(&signed_cbor.0).to_request())
     }
 
-    pub fn print_blockchain(&self) -> Result<Response> {
-        send_bytes(&self.destination, UserCommand::PrintBlockchain.to_request())
+    pub fn print_blockchain(&self) -> Result<String> {
+        let response = send_bytes(&self.destination, UserCommand::PrintBlockchain.to_request())?;
+        if let Response::External(ExternalResponse::Success(UserCommandResponse::PrintBlockchainResponse{blocks})) = response {
+            Ok(blocks.join("\n\n"))
+        } else {
+            Err(anyhow!("Unexpected response for print_blockchain: {:?}", response))
+        }
     }
 }
 
