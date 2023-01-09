@@ -82,6 +82,10 @@ impl CommandRequest {
     pub fn to_request(self) -> Request {
         Request::Internal(InternalRequest::new(self))
     }
+
+    pub fn to_request_with_id(self, id: &str) -> Request {
+        Request::Internal(InternalRequest::new_with_id(self, id))
+    }
 }
 
 impl InternalRequest {
@@ -89,6 +93,12 @@ impl InternalRequest {
         let request_id = Uuid::new_v4().to_string();
         InternalRequest {
             request_id,
+            command,
+        }
+    }
+    pub fn new_with_id(command: CommandRequest, request_id: &str) -> Self {
+        InternalRequest {
+            request_id: request_id.to_string(),
             command,
         }
     }

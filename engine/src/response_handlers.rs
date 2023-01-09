@@ -1,13 +1,13 @@
 use std::{sync::{Arc, Mutex}, borrow::BorrowMut};
 
 use anyhow::{Result, anyhow};
-use protocol::{response::Response, internal::{InternalResponse, CommandResponse}};
+use protocol::{response::Response, internal::{InternalResponse, CommandResponse}, request::Request};
 
-use crate::{blockchain::blockchain::BlockChain, model::{PublicKeyStr, Signature}};
+use crate::{blockchain::blockchain::BlockChain, model::{PublicKeyStr, Signature}, configuration::ValidatorPublicKeyAndAddress};
 
 use super::blockchain::validator_signature::ValidatorSignature;
 
-pub fn handle_response(blockchain: &Arc<Mutex<BlockChain>>, response: Response) -> Result<()> {
+pub fn handle_response(blockchain: &Arc<Mutex<BlockChain>>, response: Response) -> Result<Vec<(ValidatorPublicKeyAndAddress, Request)>> {
     match response {
         Response::Internal(InternalResponse::Success {request_id, response}) => handle_command_response(blockchain.lock().unwrap().borrow_mut(), &response),
         Response::Internal(InternalResponse::Error {msg}) => Err(anyhow!("Error happened: {}", msg)),
@@ -15,9 +15,9 @@ pub fn handle_response(blockchain: &Arc<Mutex<BlockChain>>, response: Response) 
     }
 }
 
-fn handle_command_response(blockchain: &mut BlockChain, response: &CommandResponse) -> Result<()> {
+fn handle_command_response(blockchain: &mut BlockChain, response: &CommandResponse) -> Result<Vec<(ValidatorPublicKeyAndAddress, Request)>> {
     match response {
-        CommandResponse::OnBoardValidatorResponse { validators } => Ok(()),
+        CommandResponse::OnBoardValidatorResponse { validators } => Ok(Vec::new()),
         CommandResponse::SynchronizeBlockchainResponse { transaction_cbor, expected_blockchain_hash } => todo!(),
         CommandResponse::RequestTransactionValidationResponse { validator_public_key, validator_signature, .. } => {
             let last = blockchain.blocks.last_mut().unwrap();
@@ -25,7 +25,7 @@ fn handle_command_response(blockchain: &mut BlockChain, response: &CommandRespon
             let validator_signature_json = serde_json::to_string_pretty(&validator_signature)?;
             last.validator_signatures.push(validator_signature);
             println!("New validation added (total {}) {}", last.validator_signatures.len(), validator_signature_json);
-            Ok(())
+            Ok(Vec::new())
         },
     }
 }

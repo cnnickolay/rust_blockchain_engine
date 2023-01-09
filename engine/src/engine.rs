@@ -8,7 +8,7 @@ use protocol::{request::Request, response::Response, internal::InternalResponse,
 use rsa::RsaPublicKey;
 use std::{
     io::{Read, Write},
-    net::{TcpListener, TcpStream}, sync::{Mutex, Arc},
+    net::{TcpListener, TcpStream}, sync::{Mutex, Arc}, collections::HashSet,
 };
 
 pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator_opt: Option<&str>) -> Result<()> {
@@ -27,23 +27,39 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
         send_on_boarding_request(&mut configuration, &host, port, remote_validator, validator_public_key)?;
     }
 
-    // let mut triggered_requests = Vec::new();
+    let mut triggered_requests = Vec::new();
+    let mut processed_requests = HashSet::<String>::new();
 
     loop {
-        let (mut stream, addr) = listener.accept()?;
-        println!("New connection opened");
-
-        let request = receive_and_parse(&mut stream)?;
-        let (response, following_requests) = handle_request(&request, blockchain.clone(), &mut configuration)?;
-
-        let bytes = serde_cbor::to_vec(&response)?;
-        stream.write(&bytes)?;
-
-        for ((_, addr), request) in following_requests {
-            let blockchain = blockchain.clone();
-            println!("Sending a following request");
-            let response = send_bytes(&addr.0, request).unwrap();
-            handle_response(&blockchain, response).unwrap();
+        if triggered_requests.is_empty() {
+            let (mut stream, addr) = listener.accept()?;
+            println!("New connection opened");
+    
+            let request = receive_and_parse(&mut stream)?;
+            let response = if processed_requests.contains(&request.request_id()) {
+                let response = match request {
+                    Request::Internal(_) => Response::Internal(InternalResponse::Error{msg: format!("Request {} already processed", request.request_id())}),
+                    Request::External(_) => Response::External(ExternalResponse::Error{msg: format!("Request {} already processed", request.request_id())}),
+                };
+                response
+            } else {
+                processed_requests.insert(request.request_id());
+                let (response, sub_requests) = handle_request(&request, blockchain.clone(), &mut configuration)?;
+                triggered_requests = sub_requests;
+                response
+            };
+            let bytes = serde_cbor::to_vec(&response)?;
+            stream.write(&bytes)?;
+        } else {
+            let mut new_requests = Vec::new();
+            for ((_, addr), request) in triggered_requests {
+                let blockchain = blockchain.clone();
+                println!("Sending triggered request");
+                let response = send_bytes(&addr.0, request).unwrap();
+                let requests = handle_response(&blockchain, response).unwrap_or_else(|err| {println!("{}", err); Vec::new()});
+                new_requests.extend(requests);
+            }
+            triggered_requests = new_requests;
         }
     }
 }
@@ -91,14 +107,14 @@ pub fn handle_request(
     let response = match request {
         Request::Internal(req) => {
             match req.handle_request(blockchain, configuration) {
-                Ok((response, following_requests)) => (Response::Internal(response), following_requests),
+                Ok((response, triggered_requests)) => (Response::Internal(response), triggered_requests),
                 Err(err) => (Response::Internal(InternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
             }
             
         }
         Request::External(req) => {
             match req.handle_request(blockchain, configuration) {
-                Ok((result, following_requests)) => (Response::External(result), following_requests),
+                Ok((result, triggered_requests)) => (Response::External(result), triggered_requests),
                 Err(err) => (Response::External(ExternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
             }
         }

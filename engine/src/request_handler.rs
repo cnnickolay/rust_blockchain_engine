@@ -42,12 +42,9 @@ impl RequestHandler<InternalResponse> for InternalRequest {
 
                 let mut requests = Vec::new();
 
-                // to avoid infinite loop (seek for better solution :-/)
-                if !retransmitted {
-                    for validator in &configuration.validators {
-                        let request = internal::CommandRequest::new_on_board_command(&new_validator_address, &new_validator_public_key, true).to_request();
-                        requests.push((validator.clone(), request));
-                    }
+                for validator in &configuration.validators {
+                    let request = internal::CommandRequest::new_on_board_command(&new_validator_address, &new_validator_public_key, true).to_request_with_id(&self.request_id);
+                    requests.push((validator.clone(), request));
                 }
 
                 let validator_address = ValidatorAddress(new_validator_address.to_owned());
