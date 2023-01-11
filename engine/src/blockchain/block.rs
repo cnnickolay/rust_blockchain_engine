@@ -1,3 +1,4 @@
+use protocol::request::ValidatorWithSignature;
 use rsa::RsaPrivateKey;
 use serde::Serialize;
 use sha1::Digest;
@@ -48,5 +49,14 @@ impl Block {
         let computed_hash = hasher.finalize().to_vec();
 
         Ok(computed_hash == hex::decode(&self.hash)?)
+    }
+}
+
+impl From<&ValidatorWithSignature> for ValidatorSignature {
+    fn from(v: &ValidatorWithSignature) -> Self {
+        ValidatorSignature::new(
+            &PublicKeyStr::from_str(&v.validator.public_key),
+            &Signature::from_string(&v.signature)
+        )
     }
 }

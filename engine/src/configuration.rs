@@ -42,6 +42,16 @@ impl Configuration {
         });
         self.validators.extend(Vec::from_iter(new_distinct_validators.cloned()));
     }
+
+    pub fn find_validator_address_by_key(&self, key: &PublicKeyStr) -> Option<ValidatorAddress> {
+        self.validators.iter().find_map(|(v_pub_k, v_addr)| {
+            if v_pub_k == key {
+                Some(v_addr.clone())
+            } else {
+                None
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

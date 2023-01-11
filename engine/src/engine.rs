@@ -57,9 +57,10 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
             let mut new_requests = Vec::new();
             for ((_, addr), request) in triggered_requests {
                 let blockchain = blockchain.clone();
-                println!("Sending triggered request");
+                let request_id = request.request_id.clone();
+                println!("Sending triggered request with id {}", request_id);
                 let response = send_bytes(&addr.0, request).unwrap();
-                let requests = handle_response(&blockchain, &mut configuration, &response).unwrap_or_else(|err| {println!("{}", err); Vec::new()});
+                let requests = handle_response(&blockchain, &mut configuration, &request_id, &response).unwrap_or_else(|err| {println!("{}", err); Vec::new()});
                 new_requests.extend(requests);
             }
             triggered_requests = new_requests;

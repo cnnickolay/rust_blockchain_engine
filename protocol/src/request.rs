@@ -35,8 +35,10 @@ pub enum CommandRequest {
         return_address: String,
     },
     SynchronizeBlockchain {
-        address: String,
-        blockchain_hash: String,
+        signatures: Vec<ValidatorWithSignature>,
+        transaction_cbor: String,
+        blockchain_tip_before_transaction: String,
+        blockchain_tip_after_transaction: String,
     },
     RequestTransactionValidation {
         // blockchain hash before transaction was committed
@@ -46,7 +48,7 @@ pub enum CommandRequest {
         transaction_cbor: String,
         validator_signature: ValidatorWithSignature,
         validator: Validator
-    }
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -75,11 +77,11 @@ pub enum CommandResponse {
     OnBoardValidatorResponse {
         validators: Vec<Validator>
     },
-    SynchronizeBlockchainResponse {
-        transaction_cbor: String,
-        expected_blockchain_hash: String,
-    },
+    SynchronizeBlockchainResponse {},
     RequestTransactionValidationResponse {
+        // blockchain hash before the transaction was applied
+        old_blockchain_tip: String,
+        // blockchain hash after the transaction was applied
         new_blockchain_tip: String,
         validator_public_key: String,
         transaction_cbor: String,

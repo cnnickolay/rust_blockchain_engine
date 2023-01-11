@@ -50,7 +50,6 @@ pub fn handle_request(
                 response: CommandResponse::OnBoardValidatorResponse { validators: all_validators },
             }, requests)
         },
-        CommandRequest::SynchronizeBlockchain { address, blockchain_hash } => todo!(),
         CommandRequest::PingCommand { msg } => {
             println!("Received ping command");
             ok(Response::Success {
@@ -171,8 +170,27 @@ pub fn handle_request(
                     validator_public_key: configuration.validator_public_key.0.0.to_owned(),
                     transaction_cbor: transaction_cbor.to_owned(),
                     validator_signature: validator_signature.validator_signature.0.0.to_owned(),
+                    old_blockchain_tip: blockchain_previous_tip.to_owned(),
                 },
             })
+        },
+        CommandRequest::SynchronizeBlockchain { signatures, transaction_cbor, blockchain_tip_before_transaction, blockchain_tip_after_transaction  } => {
+            println!("Synchronization request received");
+            let mut blockchain = blockchain.lock().unwrap();
+            let last = blockchain.blocks.last_mut().unwrap();
+
+            if last.hash != *blockchain_tip_after_transaction {
+                return err(&format!("Blockchain tips are different, synchronization needed. Incoming tip: {}, this blockchain tip: {}", blockchain_tip_after_transaction, last.hash));
+            }
+
+            if signatures.len() > 1 {
+                return err(&format!("Only one signature is supported by SynchronizeBlockchain for now, received {}", signatures.len()));
+            }
+
+            let signature = &signatures[0];
+            last.validator_signatures.push(signature.into());
+
+            success(&request.request_id, CommandResponse::SynchronizeBlockchainResponse{})
         },
         CommandRequest::PrintBlockchain => {
             let blockchain = blockchain.lock().unwrap();
@@ -211,6 +229,14 @@ pub fn handle_request(
 
 fn ok(response: Response) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
     Ok((response, Vec::new()))
+}
+
+fn success(request_id: &str, command_response: CommandResponse) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
+    ok(Response::Success { request_id: request_id.to_owned(), response: command_response })
+} 
+
+fn err(msg: &str) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
+    Ok((Response::Error { msg: msg.to_owned() }, Vec::new()))
 }
 
 fn ok_with_requests(response: Response, requests: Vec<(ValidatorReference, Request)>) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
