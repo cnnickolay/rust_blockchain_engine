@@ -3,18 +3,18 @@ use std::{sync::{Arc, Mutex}, borrow::BorrowMut};
 use anyhow::Result;
 use protocol::{request::CommandResponse, request::{Request, Response}};
 
-use crate::{blockchain::blockchain::BlockChain, model::{PublicKeyStr, Signature}, configuration::{ValidatorPublicKeyAndAddress, ValidatorAddress, Configuration}};
+use crate::{blockchain::blockchain::BlockChain, model::{PublicKeyStr, Signature}, configuration::{ValidatorReference, ValidatorAddress, Configuration}};
 
 use super::blockchain::validator_signature::ValidatorSignature;
 
-pub fn handle_response(blockchain: &Arc<Mutex<BlockChain>>, configuration: &mut Configuration, response: &Response) -> Result<Vec<(ValidatorPublicKeyAndAddress, Request)>> {
+pub fn handle_response(blockchain: &Arc<Mutex<BlockChain>>, configuration: &mut Configuration, response: &Response) -> Result<Vec<(ValidatorReference, Request)>> {
     match response {
         Response::Success { request_id, response } => handle_command(blockchain.lock().unwrap().borrow_mut(), configuration, response),
         Response::Error { msg } => Err(anyhow::anyhow!(msg.to_owned())),
     }
 }
 
-fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration, response: &CommandResponse) -> Result<Vec<(ValidatorPublicKeyAndAddress, Request)>> {
+fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration, response: &CommandResponse) -> Result<Vec<(ValidatorReference, Request)>> {
     match response {
         CommandResponse::OnBoardValidatorResponse { validators } => {
             let new_validators: Vec<_> = validators.iter().map(|v| (PublicKeyStr::from_str(&v.public_key), ValidatorAddress(v.address.to_owned()))).collect();

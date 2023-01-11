@@ -2,7 +2,7 @@ use rsa::RsaPrivateKey;
 
 use crate::model::{PrivateKeyStr, PublicKeyStr};
 
-pub type ValidatorPublicKeyAndAddress = (PublicKeyStr, ValidatorAddress);
+pub type ValidatorReference = (PublicKeyStr, ValidatorAddress);
 
 /**
  * A runtime configuration for current node
@@ -12,7 +12,7 @@ pub struct Configuration {
     pub port: u16,
     pub validator_private_key: PrivateKeyStr,
     pub validator_public_key: PublicKeyStr,
-    pub validators: Vec<ValidatorPublicKeyAndAddress>,
+    pub validators: Vec<ValidatorReference>,
 }
 
 impl Configuration {
@@ -32,7 +32,7 @@ impl Configuration {
         format!("{}:{}", self.ip, self.port)
     }
 
-    pub fn add_validators(&mut self, new_validators: &[ValidatorPublicKeyAndAddress]) {
+    pub fn add_validators(&mut self, new_validators: &[ValidatorReference]) {
         let new_distinct_validators = new_validators.iter().filter(|(validator_pub_key, validator_addr) | {
             *validator_pub_key != self.validator_public_key &&
             self.validators.iter()

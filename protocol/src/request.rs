@@ -19,7 +19,6 @@ pub enum Response {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CommandRequest {
     PingCommand { msg: String },
-    CreateRecord { data: String },
     GenerateWallet,
     PrintBalances,
     BalanceTransaction {
@@ -45,7 +44,8 @@ pub enum CommandRequest {
         // blockchain hash after transaction was committed
         blockchain_new_tip: String,
         transaction_cbor: String,
-        validator_signature: ValidatorSignature,
+        validator_signature: ValidatorWithSignature,
+        validator: Validator
     }
 }
 
@@ -94,7 +94,7 @@ pub struct Validator {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ValidatorSignature {
+pub struct ValidatorWithSignature {
     pub validator: Validator,
     pub signature: String
 }

@@ -1,8 +1,5 @@
 #[cfg(test)]
 mod tests {
-
-    use std::sync::{Arc, Mutex};
-
     use crate::{blockchain::{transaction::Transaction, blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}};
 
     #[test]
@@ -11,9 +8,8 @@ mod tests {
         let (priv_1, pub_1) = &generate_rsa_keypair_custom().unwrap();
         let (priv_2, pub_2) = &generate_rsa_keypair_custom().unwrap();
         
-        let blockchain = BlockChain::new(validator_public_key, UnspentOutput::new(&pub_1, 10));
-        let blockchain = Arc::new(Mutex::new(blockchain));
-        assert_eq!(blockchain.lock().unwrap().blocks.len(), 0, "Number of transactions is wrong");
+        let mut blockchain = BlockChain::new(validator_public_key, UnspentOutput::new(&pub_1, 10));
+        assert_eq!(blockchain.blocks.len(), 0, "Number of transactions is wrong");
         
         // first transaction
         let transaction = Transaction::new(&pub_1, &pub_2, 10)
@@ -28,8 +24,8 @@ mod tests {
 
         let signed_transaction = transaction.sign(&priv_1.try_into().unwrap()).unwrap();
 
-        let block = blockchain.lock().unwrap().commit_transaction(&signed_transaction, validator_private_key).unwrap();
-        assert_eq!(blockchain.lock().unwrap().blocks.len(), 1, "Number of transactions is wrong");
+        let block = blockchain.commit_transaction(&signed_transaction, validator_private_key).unwrap();
+        assert_eq!(blockchain.blocks.len(), 1, "Number of transactions is wrong");
         assert_eq!(block.validator_signatures.len(), 1, "Number of signatures is wrong");
         assert_eq!(block.validator_signatures[0].validator_public_key, *validator_public_key, "Number of signatures is wrong");
 
@@ -39,11 +35,11 @@ mod tests {
             .unwrap()
             .sign(&priv_2.try_into().unwrap())
             .unwrap()
-            .commit(&blockchain, validator_private_key)
+            .commit(&mut blockchain, validator_private_key)
             .unwrap()
             .transaction;
 
-        assert_eq!(blockchain.lock().unwrap().blocks.len(), 2, "Number of transactions is wrong");
+        assert_eq!(blockchain.blocks.len(), 2, "Number of transactions is wrong");
         
         assert_eq!(transaction.inputs().len(), 1, "Number of inputs is wrong");
         assert_eq!(transaction.inputs()[0].address, *pub_2, "From address is wrong");
@@ -60,9 +56,9 @@ mod tests {
             .unwrap()
             .sign(&priv_2.try_into().unwrap())
             .unwrap()
-            .commit(&blockchain, validator_private_key)
+            .commit(&mut blockchain, validator_private_key)
             .unwrap();
-        assert_eq!(blockchain.lock().unwrap().blocks.len(), 3, "Number of transactions is wrong");
+        assert_eq!(blockchain.blocks.len(), 3, "Number of transactions is wrong");
 
         // fourth transaction
         let transaction = Transaction::new(&pub_1, &pub_2, 8)
@@ -70,11 +66,11 @@ mod tests {
             .unwrap()
             .sign(&priv_1.try_into().unwrap())
             .unwrap()
-            .commit(&blockchain, validator_private_key)
+            .commit(&mut blockchain, validator_private_key)
             .unwrap()
             .transaction;
 
-        assert_eq!(blockchain.lock().unwrap().blocks.len(), 4, "Number of transactions is wrong");
+        assert_eq!(blockchain.blocks.len(), 4, "Number of transactions is wrong");
 
         assert_eq!(transaction.inputs().len(), 2, "Number of inputs is wrong");
         assert_eq!(transaction.inputs()[0].address, *pub_1, "From address is wrong");

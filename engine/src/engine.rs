@@ -25,6 +25,7 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
 
     let mut triggered_requests = Vec::new();
 
+    // Register current validator with other validators
     if let Some(remote_validator) = remote_validator_opt {
         let request = CommandRequest::new_on_board_command(&format!("{}:{}", host, port), &validator_public_key.0.0).to_request();
         triggered_requests.push(
