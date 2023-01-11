@@ -7,7 +7,7 @@ use protocol::{
 use crate::{
     configuration::{Configuration, ValidatorAddress, ValidatorPublicKeyAndAddress},
     encryption::generate_rsa_key_pair,
-    model::{HexString, PublicKeyStr}, blockchain::{blockchain::BlockChain, transaction::Transaction, signed_balanced_transaction::{SignedBalancedTransaction, self}, cbor::Cbor, block::Block}, client::Client, utils::shorten_long_string,
+    model::{HexString, PublicKeyStr}, blockchain::{blockchain::BlockChain, transaction::Transaction, signed_balanced_transaction::{SignedBalancedTransaction}, cbor::Cbor}, utils::shorten_long_string,
 };
 use anyhow::{Result, anyhow};
 

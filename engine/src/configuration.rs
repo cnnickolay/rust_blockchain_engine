@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 use rsa::RsaPrivateKey;
 
 use crate::model::{PrivateKeyStr, PublicKeyStr};

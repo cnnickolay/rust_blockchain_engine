@@ -1,10 +1,10 @@
 use std::{net::TcpStream, io::Write};
 
 use anyhow::{Result, anyhow};
-use protocol::{request::Request, request::{self, CommandResponse, Validator, Response, CommandRequest}};
+use protocol::{request::Request, request::{CommandResponse, Response, CommandRequest}};
 use rsa::RsaPrivateKey;
 
-use crate::{model::{PublicKeyStr, PrivateKeyStr}, blockchain::{cbor::Cbor, balanced_transaction::BalancedTransaction}};
+use crate::{model::{PrivateKeyStr}, blockchain::{cbor::Cbor, balanced_transaction::BalancedTransaction}};
 
 pub struct Client {
     destination: String,
