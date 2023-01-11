@@ -1,10 +1,10 @@
 use crate::{
-    configuration::{Configuration, ValidatorAddress, ValidatorPublicKeyAndAddress},
+    configuration::{Configuration, ValidatorAddress},
     model::PublicKeyStr,
-    request_handler::RequestHandler, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}, client::{Client, send_bytes}, response_handlers::handle_response,
+    request_handlers::handle_request, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}, client::{send_bytes}, response_handlers::handle_response,
 };
 use anyhow::Result;
-use protocol::{request::Request, response::Response, internal::InternalResponse, external::ExternalResponse};
+use protocol::{request::{Request, CommandRequest}, request::Response};
 use rsa::RsaPublicKey;
 use std::{
     io::{Read, Write},
@@ -23,11 +23,17 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
     let blockchain = BlockChain::new(validator_public_key, UnspentOutput::initial_utxo(&pub_key_str, 100));
     let blockchain = Arc::new(Mutex::new(blockchain));
 
+    let mut triggered_requests = Vec::new();
+
     if let Some(remote_validator) = remote_validator_opt {
-        send_on_boarding_request(&mut configuration, &host, port, remote_validator, validator_public_key)?;
+        let request = CommandRequest::new_on_board_command(&format!("{}:{}", host, port), &validator_public_key.0.0).to_request();
+        triggered_requests.push(
+            (
+                (PublicKeyStr::from_str("not-necessary-here"), ValidatorAddress(remote_validator.to_owned())
+            ), request)
+        );
     }
 
-    let mut triggered_requests = Vec::new();
     let mut processed_requests = HashSet::<String>::new();
 
     loop {
@@ -36,14 +42,10 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
             println!("New connection opened");
     
             let request = receive_and_parse(&mut stream)?;
-            let response = if processed_requests.contains(&request.request_id()) {
-                let response = match request {
-                    Request::Internal(_) => Response::Internal(InternalResponse::Error{msg: format!("Request {} already processed", request.request_id())}),
-                    Request::External(_) => Response::External(ExternalResponse::Error{msg: format!("Request {} already processed", request.request_id())}),
-                };
-                response
+            let response = if processed_requests.contains(&request.request_id) {
+                Response::Error {msg: format!("Request {} already processed", request.request_id)}
             } else {
-                processed_requests.insert(request.request_id());
+                processed_requests.insert(request.request_id.to_owned());
                 let (response, sub_requests) = handle_request(&request, blockchain.clone(), &mut configuration)?;
                 triggered_requests = sub_requests;
                 response
@@ -56,7 +58,7 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
                 let blockchain = blockchain.clone();
                 println!("Sending triggered request");
                 let response = send_bytes(&addr.0, request).unwrap();
-                let requests = handle_response(&blockchain, response).unwrap_or_else(|err| {println!("{}", err); Vec::new()});
+                let requests = handle_response(&blockchain, &mut configuration, &response).unwrap_or_else(|err| {println!("{}", err); Vec::new()});
                 new_requests.extend(requests);
             }
             triggered_requests = new_requests;
@@ -67,18 +69,18 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
 /**
  * Sends onboarding request to another validator to build a network of validator nodes
  */
-pub fn send_on_boarding_request(configuration: &mut Configuration, ip: &str, port: u16, remote_validator_address: &str, public_key: &PublicKeyStr) -> Result<()> {
-    let client = Client::new(remote_validator_address);
-    let response = client.register_validator(&format!("{}:{}", ip, port), public_key, false)?;
-    let new_validators: Vec<_> = response.iter().map(|v| (PublicKeyStr::from_str(&v.public_key), ValidatorAddress(v.address.to_owned()))).collect();
+// pub fn send_on_boarding_request(configuration: &mut Configuration, ip: &str, port: u16, remote_validator_address: &str, public_key: &PublicKeyStr) -> Result<()> {
+//     let client = Client::new(remote_validator_address);
+//     let response = client.register_validator(&format!("{}:{}", ip, port), public_key, false)?;
+//     let new_validators: Vec<_> = response.iter().map(|v| (PublicKeyStr::from_str(&v.public_key), ValidatorAddress(v.address.to_owned()))).collect();
 
-    // extending the list of known validators
-    configuration.add_validators(&new_validators);
+//     // extending the list of known validators
+//     configuration.add_validators(&new_validators);
 
-    println!("Validators added: {:?}", configuration.validators.iter().map(|validator| &validator.1).collect::<Vec<&ValidatorAddress>>());
+//     println!("Validators added: {:?}", configuration.validators.iter().map(|validator| &validator.1).collect::<Vec<&ValidatorAddress>>());
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 /**
  * Reads request from socket and parses it
@@ -95,30 +97,33 @@ fn receive_and_parse(stream: &mut TcpStream) -> Result<Request> {
     Ok(received_msg)
 }
 
-/**
- * Handles the request and sends response to the socket
- */
-pub fn handle_request(
-    request: &Request,
-    blockchain: Arc<Mutex<BlockChain>>,
-    configuration: &mut Configuration,
-) -> Result<(Response, Vec<(ValidatorPublicKeyAndAddress, Request)>)> {
-    println!("Received request: {:?}", request);
-    let response = match request {
-        Request::Internal(req) => {
-            match req.handle_request(blockchain, configuration) {
-                Ok((response, triggered_requests)) => (Response::Internal(response), triggered_requests),
-                Err(err) => (Response::Internal(InternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
-            }
-            
-        }
-        Request::External(req) => {
-            match req.handle_request(blockchain, configuration) {
-                Ok((result, triggered_requests)) => (Response::External(result), triggered_requests),
-                Err(err) => (Response::External(ExternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
-            }
-        }
-    };
+// /**
+//  * Handles the request and sends response to the socket
+//  */
+// pub fn handle_request(
+//     request: &Request,
+//     blockchain: Arc<Mutex<BlockChain>>,
+//     configuration: &mut Configuration,
+// ) -> Result<(Response, Vec<(ValidatorPublicKeyAndAddress, Request)>)> {
+//     println!("Received request: {:?}", request);
 
-    Ok(response)
-}
+//     handle_request(blockchain, configuration);
+
+//     let response = match request {
+//         Request::Internal(req) => {
+//             match req.handle_request(blockchain, configuration) {
+//                 Ok((response, triggered_requests)) => (Response::Internal(response), triggered_requests),
+//                 Err(err) => (Response::Internal(InternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
+//             }
+            
+//         }
+//         Request::External(req) => {
+//             match req.handle_request(blockchain, configuration) {
+//                 Ok((result, triggered_requests)) => (Response::External(result), triggered_requests),
+//                 Err(err) => (Response::External(ExternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
+//             }
+//         }
+//     };
+
+//     Ok(response)
+// }

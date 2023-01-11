@@ -1,23 +1,28 @@
 use std::{sync::{Arc, Mutex}, borrow::BorrowMut};
 
-use anyhow::{Result, anyhow};
-use protocol::{response::Response, internal::{InternalResponse, CommandResponse}, request::Request};
+use anyhow::Result;
+use protocol::{request::CommandResponse, request::{Request, Response}};
 
-use crate::{blockchain::blockchain::BlockChain, model::{PublicKeyStr, Signature}, configuration::ValidatorPublicKeyAndAddress};
+use crate::{blockchain::blockchain::BlockChain, model::{PublicKeyStr, Signature}, configuration::{ValidatorPublicKeyAndAddress, ValidatorAddress, Configuration}};
 
 use super::blockchain::validator_signature::ValidatorSignature;
 
-pub fn handle_response(blockchain: &Arc<Mutex<BlockChain>>, response: Response) -> Result<Vec<(ValidatorPublicKeyAndAddress, Request)>> {
+pub fn handle_response(blockchain: &Arc<Mutex<BlockChain>>, configuration: &mut Configuration, response: &Response) -> Result<Vec<(ValidatorPublicKeyAndAddress, Request)>> {
     match response {
-        Response::Internal(InternalResponse::Success {request_id, response}) => handle_command_response(blockchain.lock().unwrap().borrow_mut(), &response),
-        Response::Internal(InternalResponse::Error {msg}) => Err(anyhow!("Error happened: {}", msg)),
-        Response::External(resp) => Err(anyhow!("Only internal responses are supported here")),
+        Response::Success { request_id, response } => handle_command(blockchain.lock().unwrap().borrow_mut(), configuration, response),
+        Response::Error { msg } => Err(anyhow::anyhow!(msg.to_owned())),
     }
 }
 
-fn handle_command_response(blockchain: &mut BlockChain, response: &CommandResponse) -> Result<Vec<(ValidatorPublicKeyAndAddress, Request)>> {
+fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration, response: &CommandResponse) -> Result<Vec<(ValidatorPublicKeyAndAddress, Request)>> {
     match response {
-        CommandResponse::OnBoardValidatorResponse { validators } => Ok(Vec::new()),
+        CommandResponse::OnBoardValidatorResponse { validators } => {
+            let new_validators: Vec<_> = validators.iter().map(|v| (PublicKeyStr::from_str(&v.public_key), ValidatorAddress(v.address.to_owned()))).collect();
+            configuration.add_validators(&new_validators);
+            println!("Validators added: {:?}", configuration.validators.iter().map(|validator| &validator.1).collect::<Vec<&ValidatorAddress>>());
+
+            Ok(Vec::new())
+        },
         CommandResponse::SynchronizeBlockchainResponse { transaction_cbor, expected_blockchain_hash } => todo!(),
         CommandResponse::RequestTransactionValidationResponse { validator_public_key, validator_signature, .. } => {
             let last = blockchain.blocks.last_mut().unwrap();
@@ -27,5 +32,11 @@ fn handle_command_response(blockchain: &mut BlockChain, response: &CommandRespon
             println!("New validation added (total {}) {}", last.validator_signatures.len(), validator_signature_json);
             Ok(Vec::new())
         },
+        CommandResponse::PingCommandResponse { msg } => todo!(),
+        CommandResponse::GenerateWalletResponse { private_key, public_key } => todo!(),
+        CommandResponse::PrintBalancesResponse { balances } => todo!(),
+        CommandResponse::BalanceTransactionResponse { request_id, body, cbor } => todo!(),
+        CommandResponse::CommitTransactionResponse { blockchain_hash } => todo!(),
+        CommandResponse::PrintBlockchainResponse { blocks } => todo!(),
     }
 }

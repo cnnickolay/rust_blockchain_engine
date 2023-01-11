@@ -4,12 +4,12 @@
 pub mod engine;
 pub mod model;
 pub mod serializer;
-pub mod request_handler;
 pub mod client;
 pub mod configuration;
 pub mod encryption;
 pub mod blockchain;
 pub mod utils;
+pub mod request_handlers;
 pub mod response_handlers;
 
 pub use engine::run_node;

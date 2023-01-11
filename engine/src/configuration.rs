@@ -35,13 +35,14 @@ impl Configuration {
     }
 
     pub fn add_validators(&mut self, new_validators: &[ValidatorPublicKeyAndAddress]) {
-        self.validators.extend(new_validators.iter().cloned());
-        self.validators.dedup();
-
-        // make sure this validators won't get into the list of known validators
-        if let Some((idx, _)) = self.validators.iter().enumerate().find(|(idx, (validator_public_key, _))| *validator_public_key == self.validator_public_key) {
-            self.validators.remove(idx);
-        }
+        let new_distinct_validators = new_validators.iter().filter(|(validator_pub_key, validator_addr) | {
+            *validator_pub_key != self.validator_public_key &&
+            self.validators.iter()
+                .find(|(existing_validator_pub_key, existing_validator_addr)| 
+                    existing_validator_pub_key == validator_pub_key
+                ).is_none()
+        });
+        self.validators.extend(Vec::from_iter(new_distinct_validators.cloned()));
     }
 }
 
