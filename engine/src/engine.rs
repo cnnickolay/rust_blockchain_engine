@@ -67,22 +67,6 @@ pub fn run_node(host: String, port: u16, root_public_key: &str, remote_validator
 }
 
 /**
- * Sends onboarding request to another validator to build a network of validator nodes
- */
-// pub fn send_on_boarding_request(configuration: &mut Configuration, ip: &str, port: u16, remote_validator_address: &str, public_key: &PublicKeyStr) -> Result<()> {
-//     let client = Client::new(remote_validator_address);
-//     let response = client.register_validator(&format!("{}:{}", ip, port), public_key, false)?;
-//     let new_validators: Vec<_> = response.iter().map(|v| (PublicKeyStr::from_str(&v.public_key), ValidatorAddress(v.address.to_owned()))).collect();
-
-//     // extending the list of known validators
-//     configuration.add_validators(&new_validators);
-
-//     println!("Validators added: {:?}", configuration.validators.iter().map(|validator| &validator.1).collect::<Vec<&ValidatorAddress>>());
-
-//     Ok(())
-// }
-
-/**
  * Reads request from socket and parses it
  */
 fn receive_and_parse(stream: &mut TcpStream) -> Result<Request> {
@@ -96,34 +80,3 @@ fn receive_and_parse(stream: &mut TcpStream) -> Result<Request> {
     let received_msg: Request = serde_cbor::from_slice(&buf[0..size_received])?;
     Ok(received_msg)
 }
-
-// /**
-//  * Handles the request and sends response to the socket
-//  */
-// pub fn handle_request(
-//     request: &Request,
-//     blockchain: Arc<Mutex<BlockChain>>,
-//     configuration: &mut Configuration,
-// ) -> Result<(Response, Vec<(ValidatorPublicKeyAndAddress, Request)>)> {
-//     println!("Received request: {:?}", request);
-
-//     handle_request(blockchain, configuration);
-
-//     let response = match request {
-//         Request::Internal(req) => {
-//             match req.handle_request(blockchain, configuration) {
-//                 Ok((response, triggered_requests)) => (Response::Internal(response), triggered_requests),
-//                 Err(err) => (Response::Internal(InternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
-//             }
-            
-//         }
-//         Request::External(req) => {
-//             match req.handle_request(blockchain, configuration) {
-//                 Ok((result, triggered_requests)) => (Response::External(result), triggered_requests),
-//                 Err(err) => (Response::External(ExternalResponse::Error { msg: format!("{:?}", err) }), vec![]),
-//             }
-//         }
-//     };
-
-//     Ok(response)
-// }

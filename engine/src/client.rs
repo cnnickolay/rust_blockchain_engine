@@ -19,14 +19,6 @@ impl Client {
         send_bytes(&self.destination, CommandRequest::new_ping(msg).to_request())
     }
 
-    // pub fn register_validator(&self, address: &str, public_key: &PublicKeyStr, retransmitted: bool) -> Result<Vec<Validator>> {
-    //     let response = send_bytes(&self.destination, request::CommandRequest::new_on_board_command(&address, &public_key.0.0, retransmitted).to_request())?;
-    //     match response {
-    //         Response::Internal(InternalResponse::Success {response: CommandResponse::OnBoardValidatorResponse{validators}, ..}) => Ok(validators),
-    //         bad_response => Err(anyhow!("Wrong response for registering validator: {:?}", bad_response))
-    //     } 
-    // }
-
     pub fn generate_wallet(&self) -> Result<Response> {
         send_bytes(&self.destination, CommandRequest::GenerateWallet.to_request())
     }
