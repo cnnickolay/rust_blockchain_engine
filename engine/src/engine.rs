@@ -49,7 +49,7 @@ pub fn run_node(host: String, port: u16, remote_validator_opt: Option<&str>) -> 
                 Response::Error {msg: format!("Request {} already processed", request.request_id)}
             } else {
                 processed_requests.insert(request.request_id.to_owned());
-                let (response, sub_requests) = handle_request(&request, blockchain.clone(), &mut configuration)?;
+                let (response, sub_requests) = handle_request(&request, blockchain.clone(), &mut configuration).unwrap_or_else(|e| {println!("{}", e); (Response::Error {msg: format!("{:?}", e)}, Vec::new())});
                 triggered_requests = sub_requests;
                 response
             };
