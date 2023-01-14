@@ -1,4 +1,4 @@
-# Blockchain engine
+# Custom Blockchain and Crypto currency engine
 Implementation of a custom cryptocurrency on Rust.
 
 # What's implemented as of 14th January 2023
