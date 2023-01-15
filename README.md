@@ -27,20 +27,11 @@ Validator 3 `./run-validator-2.sh`
 3. Print blockchain in all nodes
 Make sure all blocks have 3 validations each and they are identical in all nodes
 
-    4.1. First node
-    ```
-    target/debug/client_print_blockchain -d 0.0.0.0:9065
-    ```
+    4.1. First node `target/debug/client_print_blockchain -d 0.0.0.0:9065`
 
-    4.2. Second node
-    ```
-    target/debug/client_print_blockchain -d 0.0.0.0:9067
-    ```
+    4.2. Second node `target/debug/client_print_blockchain -d 0.0.0.0:9067`
 
-    4.3. Third node
-    ```
-    target/debug/client_print_blockchain -d 0.0.0.0:9068
-    ```
+    4.3. Third node `target/debug/client_print_blockchain -d 0.0.0.0:9068`
 
     **Example of client_print_blockchain output**
 
@@ -70,7 +61,7 @@ Make sure all blocks have 3 validations each and they are identical in all nodes
         Signature: 4f3078cc45758cbe16c0....f795228243dadda629c1
     ```
 
-4. Try to send the same transaction again (redo only 3rd bullet), and you'll see the following
+1. Try to send the same transaction again (redo only 3rd bullet), and you'll see the following
     ```
     # ensure this variable is defined
     echo $BALANCED_TRANSACTION
