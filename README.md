@@ -76,4 +76,4 @@ Make sure all blocks have 3 validations each and they are identical in all nodes
     ```
 
 # Questions and considerations
-Should you have any questions in regards with this project, you can reach out me at `nickolayc@gmail.com`
+Should you have any questions in regards with this project, you can reach out for me at `nickolayc@gmail.com`
