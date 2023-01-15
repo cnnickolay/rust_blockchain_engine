@@ -1,10 +1,10 @@
 use crate::{
-    configuration::{Configuration, ValidatorAddress},
+    configuration::{Configuration, ValidatorAddress, ValidatorReference},
     model::PublicKeyStr,
     request_handlers::handle_request, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}, client::{send_bytes}, response_handlers::handle_response,
 };
 use anyhow::Result;
-use protocol::{request::{Request, CommandRequest}, request::Response};
+use protocol::{request::{Request, CommandRequest}, request::{Response, ResponseBody}};
 use rsa::RsaPublicKey;
 use std::{
     io::{Read, Write},
@@ -29,12 +29,13 @@ pub fn run_node(host: String, port: u16, remote_validator_opt: Option<&str>) -> 
     // Register current validator with other validators
     if let Some(remote_validator) = remote_validator_opt {
         println!("Connecting to remote validator {}", remote_validator);
-        let request = CommandRequest::new_on_board_command(&format!("{}:{}", host, port), &validator_public_key.0.0).to_request();
+        let request = CommandRequest::new_on_board_command(&format!("{}:{}", host, port), &validator_public_key.0.0).to_request(&configuration.validator());
         triggered_requests.push(
             (
-                (PublicKeyStr::from_str("not-necessary-here"), ValidatorAddress(remote_validator.to_owned())
-            ), request)
-        );
+                ValidatorReference { pk: PublicKeyStr::from_str("not-necessary-here"), address: ValidatorAddress(remote_validator.to_owned()) }, 
+                request
+            )
+        )
     }
 
     let mut processed_requests = HashSet::<String>::new();
@@ -46,10 +47,24 @@ pub fn run_node(host: String, port: u16, remote_validator_opt: Option<&str>) -> 
     
             let request = receive_and_parse(&mut stream)?;
             let response = if processed_requests.contains(&request.request_id) {
-                Response::Error {msg: format!("Request {} already processed", request.request_id)}
+                Response { 
+                    orig_request_id: request.request_id.to_owned(), 
+                    replier: configuration.validator(), 
+                    body: ResponseBody::Error {msg: format!("Request {} already processed", request.request_id)} 
+                }
             } else {
                 processed_requests.insert(request.request_id.to_owned());
-                let (response, sub_requests) = handle_request(&request, blockchain.clone(), &mut configuration).unwrap_or_else(|e| {println!("{}", e); (Response::Error {msg: format!("{:?}", e)}, Vec::new())});
+                let (response, sub_requests) = handle_request(&request, blockchain.clone(), &mut configuration)
+                    .unwrap_or_else(|e| {
+                        println!("{}", e); 
+                        let response = Response { 
+                            orig_request_id: request.request_id.to_owned(), 
+                            replier: configuration.validator(), 
+                            body: ResponseBody::Error {msg: format!("{:?}", e) } 
+                        };
+        
+                        (response, Vec::new())
+                    });
                 triggered_requests = sub_requests;
                 response
             };
@@ -57,12 +72,16 @@ pub fn run_node(host: String, port: u16, remote_validator_opt: Option<&str>) -> 
             stream.write(&bytes)?;
         } else {
             let mut new_requests = Vec::new();
-            for ((_, addr), request) in triggered_requests {
+            for (ValidatorReference { address, .. }, request) in triggered_requests {
                 let blockchain = blockchain.clone();
                 let request_id = request.request_id.clone();
                 println!("Sending triggered request with id {}", request_id);
-                let response = send_bytes(&addr.0, request).unwrap();
-                let requests = handle_response(&blockchain, &mut configuration, &request_id, &response).unwrap_or_else(|err| {println!("{}", err); Vec::new()});
+                let response = send_bytes(&address.0, request).unwrap();
+                let requests = handle_response(&blockchain, &mut configuration, &request_id, &response)
+                    .unwrap_or_else(|err| {
+                        println !("{}", err); 
+                        Vec::new()
+                    });
                 new_requests.extend(requests);
             }
             triggered_requests = new_requests;

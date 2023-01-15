@@ -1,7 +1,7 @@
 use std::{sync::{Mutex, Arc}};
 
 use protocol::{
-    request::{CommandResponse, CommandRequest, Validator, ValidatorWithSignature, self, Response}, request::Request,
+    request::{CommandResponse, CommandRequest, Validator, ValidatorWithSignature, self, Response}, request::{Request, ResponseBody},
 };
 
 use crate::{
@@ -18,16 +18,16 @@ pub fn handle_request(
 ) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
     match &request.command {
         protocol::request::CommandRequest::OnBoardValidator { return_address: new_validator_address, public_key: new_validator_public_key } => {
-
+            let blockchain = blockchain.lock().unwrap();
             let mut requests = Vec::new();
 
             for validator in &configuration.validators {
-                let request = request::CommandRequest::new_on_board_command(&new_validator_address, &new_validator_public_key).to_request_with_id(&request.request_id);
+                let request = request::CommandRequest::new_on_board_command(&new_validator_address, &new_validator_public_key).to_request_with_id(configuration.validator(), &request.request_id);
                 requests.push((validator.clone(), request));
             }
 
             let validator_address = ValidatorAddress(new_validator_address.to_owned());
-            configuration.add_validators(&[(PublicKeyStr::from_str(&new_validator_public_key), validator_address)]);
+            configuration.add_validators(&[ValidatorReference { pk: PublicKeyStr::from_str(&new_validator_public_key), address: validator_address } ]);
             println!(
                 "Added new validator {:?}, total validators {}",
                 new_validator_address,
@@ -36,7 +36,7 @@ pub fn handle_request(
 
             let mut all_validators: Vec<Validator> = 
                 configuration.validators.iter()
-                .map(|(public_key, addr)| {
+                .map(|ValidatorReference { pk: public_key, address: addr } | {
                     Validator { public_key: public_key.0.0.to_owned(), address: addr.0.clone()}
                 })
                 .collect();
@@ -45,28 +45,28 @@ pub fn handle_request(
                 public_key: configuration.validator_public_key.0.0.to_owned()
             });
 
-            ok_with_requests(Response::Success {
-                request_id: request.request_id.to_owned(),
-                response: CommandResponse::OnBoardValidatorResponse { validators: all_validators },
-            }, requests)
+            let response = Response {
+                orig_request_id: request.request_id.to_owned(),
+                replier: configuration.validator(),
+                body: ResponseBody::Success(CommandResponse::OnBoardValidatorResponse { 
+                    on_boarding_validator: Validator { address: configuration.address(), public_key: String::from(&configuration.validator_public_key) },
+                    validators: all_validators, 
+                    blockchain_tip: blockchain.blockchain_hash()?
+                }),
+            };
+            ok_with_requests(response, requests)
         },
         CommandRequest::PingCommand { msg } => {
             println!("Received ping command");
-            ok(Response::Success {
-                request_id: request.request_id.clone(),
-                response: CommandResponse::PingCommandResponse {
-                    msg: format!("Original message: {}, PONG PONG", msg),
-                },
+            success(&request.request_id, configuration.validator(), CommandResponse::PingCommandResponse {
+                msg: format!("Original message: {}, PONG PONG", msg),
             })
         },
         CommandRequest::GenerateWallet => {
             let (priv_k, pub_k) = &generate_rsa_key_pair()?;
-            ok(Response::Success {
-                request_id: request.request_id.clone(),
-                response: CommandResponse::GenerateWalletResponse {
-                    private_key: HexString::try_from(priv_k)?.0,
-                    public_key: HexString::try_from(pub_k)?.0,
-                }
+            success(&request.request_id, configuration.validator(), CommandResponse::GenerateWalletResponse {
+                private_key: HexString::try_from(priv_k)?.0,
+                public_key: HexString::try_from(pub_k)?.0,
             })
         },
         CommandRequest::PrintBalances => {
@@ -77,10 +77,7 @@ pub fn handle_request(
                         .map(|(k, v)| (shorten_long_string(&k.0 .0), v.clone()))
                         .collect();
 
-            ok(Response::Success {
-                request_id: request.request_id.clone(),
-                response: CommandResponse::PrintBalancesResponse { balances },
-            })
+            success(&request.request_id, configuration.validator(), CommandResponse::PrintBalancesResponse { balances })
         },
         
         CommandRequest::BalanceTransaction { from, to, amount } => {
@@ -91,10 +88,7 @@ pub fn handle_request(
             let cbor = hex::encode(&cbor_bytes);
             let body = serde_json::to_string_pretty(balanced_transaction)?;
 
-            ok(Response::Success {
-                request_id: request.request_id.clone(),
-                response: CommandResponse::BalanceTransactionResponse { request_id: request.request_id.clone(), body, cbor },
-            })
+            success(&request.request_id, configuration.validator(), CommandResponse::BalanceTransactionResponse { request_id: request.request_id.clone(), body, cbor })
         },
 
         CommandRequest::CommitTransaction { signed_transaction_cbor } => {
@@ -119,17 +113,21 @@ pub fn handle_request(
                         signature: validator_signature.validator_signature.0.0.to_owned()
                     },
                     validator: Validator { address: configuration.address(), public_key: configuration.validator_public_key.0.0.to_owned() },
-                }.to_request();
+                }.to_request(&configuration.validator());
 
                 requests.push((validator.clone(), request));
             }
 
             println!("{}", serde_json::to_string_pretty(&block)?);
 
-            ok_with_requests(Response::Success {
-                request_id: request.request_id.to_owned(),
-                response: CommandResponse::CommitTransactionResponse { blockchain_hash: block.hash.to_owned() },
-            }, requests)
+            let response = Response {
+                orig_request_id: request.request_id.to_owned(),
+                replier: configuration.validator(),
+                body: ResponseBody::Success (
+                    CommandResponse::CommitTransactionResponse { blockchain_hash: block.hash.to_owned() },
+                ),
+            };
+            ok_with_requests(response, requests)
         },
         CommandRequest::RequestTransactionValidation { blockchain_previous_tip, blockchain_new_tip, transaction_cbor, validator_signature: sender_validator_signature, validator } => {
             let mut blockchain = blockchain.lock().unwrap();
@@ -137,7 +135,7 @@ pub fn handle_request(
             if *blockchain_previous_tip != blockchain_hash {
                 let msg = format!("Transaction can't be applied for blockchains are not in sync: {} != {}", blockchain_previous_tip, blockchain_hash);
                 println!("{}", msg);
-                return ok(Response::Error { msg });
+                return err(&request.request_id, configuration.validator(), &msg);
             }
 
             let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&transaction_cbor))?;
@@ -148,7 +146,7 @@ pub fn handle_request(
             if *blockchain_new_tip != block.hash {
                 let msg = format!("Blockchain hash is different. Possibility of a hard fork");
                 println!("{}", msg);
-                return ok(Response::Error { msg })
+                return err(&request.request_id, configuration.validator(), &msg);
             }
 
             println!("Transaction successfully verified and added to blockchain. Total verifications: {}", block.validator_signatures.len());
@@ -163,16 +161,15 @@ pub fn handle_request(
                 )
             );
 
-            ok(Response::Success {
-                request_id: request.request_id.to_owned(),
-                response: CommandResponse::RequestTransactionValidationResponse {
+            success(&request.request_id, configuration.validator(), 
+                CommandResponse::RequestTransactionValidationResponse {
                     new_blockchain_tip: blockchain_hash,
                     validator_public_key: configuration.validator_public_key.0.0.to_owned(),
                     transaction_cbor: transaction_cbor.to_owned(),
                     validator_signature: validator_signature.validator_signature.0.0.to_owned(),
                     old_blockchain_tip: blockchain_previous_tip.to_owned(),
                 },
-            })
+            )
         },
         CommandRequest::SynchronizeBlockchain { signatures, transaction_cbor, blockchain_tip_before_transaction, blockchain_tip_after_transaction  } => {
             println!("Synchronization request received");
@@ -180,17 +177,17 @@ pub fn handle_request(
             let last = blockchain.blocks.last_mut().unwrap();
 
             if last.hash != *blockchain_tip_after_transaction {
-                return err(&format!("Blockchain tips are different, synchronization needed. Incoming tip: {}, this blockchain tip: {}", blockchain_tip_after_transaction, last.hash));
+                return err(&request.request_id, configuration.validator(), &format!("Blockchain tips are different, synchronization needed. Incoming tip: {}, this blockchain tip: {}", blockchain_tip_after_transaction, last.hash));
             }
 
             if signatures.len() > 1 {
-                return err(&format!("Only one signature is supported by SynchronizeBlockchain for now, received {}", signatures.len()));
+                return err(&request.request_id, configuration.validator(), &format!("Only one signature is supported by SynchronizeBlockchain for now, received {}", signatures.len()));
             }
 
             let signature = &signatures[0];
             last.validator_signatures.push(signature.into());
 
-            success(&request.request_id, CommandResponse::SynchronizeBlockchainResponse{})
+            success(&request.request_id, configuration.validator(), CommandResponse::SynchronizeBlockchainResponse{})
         },
         CommandRequest::PrintBlockchain => {
             let blockchain = blockchain.lock().unwrap();
@@ -219,10 +216,41 @@ pub fn handle_request(
 
                 block_str
             }).collect();
-            ok(Response::Success {
-                request_id: request.request_id.to_owned(),
-                response: CommandResponse::PrintBlockchainResponse { blocks },
-            })
+            success(&request.request_id, configuration.validator(), CommandResponse::PrintBlockchainResponse { blocks })
+        },
+
+        CommandRequest::RequestSynchronization { blockchain_tip } => {
+            println!("Request synchronization received for tip {}", blockchain_tip);
+            let blockchain = blockchain.lock().unwrap();
+            let block_index = blockchain.index_of_block(blockchain_tip);
+            println!("Found block at {}", block_index);
+
+            if blockchain.blockchain_hash()? == *blockchain_tip {
+                return err(&request.request_id, configuration.validator(), "Fully synchronized");
+            }
+
+            if block_index >= 0 || blockchain.initial_utxo.hash_str() == *blockchain_tip {
+                let next_block = &blockchain.blocks[(block_index + 1) as usize];
+                let next_hash = next_block.hash.to_owned();
+                let previous_hash = if block_index == -1 {
+                    blockchain.initial_utxo.hash_str()
+                } else {
+                    let hash = &blockchain.blocks[block_index as usize].hash;
+                    hash.to_owned()
+                };
+
+                let response = CommandResponse::RequestSynchronizationResponse {
+                    previous_hash, 
+                    next_hash, 
+                    transaction_cbor: Cbor::try_from(&next_block.transaction)?.0, 
+                    signatures: next_block.validator_signatures.iter().map(|v| ValidatorWithSignature::from(v)).collect() 
+                };
+
+                return success(&request.request_id, configuration.validator(), response);
+            } else {
+                let err_msg = format!("Impossible to synchronize, no common ancestor for hash {}", blockchain_tip);
+                return err(&request.request_id, configuration.validator(), &err_msg);
+            }
         },
     }
 }
@@ -231,12 +259,25 @@ fn ok(response: Response) -> Result<(Response, Vec<(ValidatorReference, Request)
     Ok((response, Vec::new()))
 }
 
-fn success(request_id: &str, command_response: CommandResponse) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
-    ok(Response::Success { request_id: request_id.to_owned(), response: command_response })
+fn success(request_id: &str, validator: Validator, command_response: CommandResponse) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
+    let body = ResponseBody::Success ( command_response );
+    let response = Response {
+        orig_request_id: request_id.to_owned(),
+        replier: validator,
+        body,
+    };
+    ok(response)
+
 } 
 
-fn err(msg: &str) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
-    Ok((Response::Error { msg: msg.to_owned() }, Vec::new()))
+fn err(request_id: &str, validator: Validator, msg: &str) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
+    let body = ResponseBody::Error { msg: msg.to_owned() };
+    let response = Response {
+        orig_request_id: request_id.to_owned(),
+        replier: validator,
+        body,
+    };
+    ok(response)
 }
 
 fn ok_with_requests(response: Response, requests: Vec<(ValidatorReference, Request)>) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {

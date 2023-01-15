@@ -1,8 +1,13 @@
+use protocol::request::Validator;
 use rsa::RsaPrivateKey;
 
 use crate::model::{PrivateKeyStr, PublicKeyStr};
 
-pub type ValidatorReference = (PublicKeyStr, ValidatorAddress);
+#[derive(Clone)]
+pub struct ValidatorReference { 
+    pub pk: PublicKeyStr, 
+    pub address: ValidatorAddress
+}
 
 /**
  * A runtime configuration for current node
@@ -33,10 +38,10 @@ impl Configuration {
     }
 
     pub fn add_validators(&mut self, new_validators: &[ValidatorReference]) {
-        let new_distinct_validators = new_validators.iter().filter(|(validator_pub_key, validator_addr) | {
+        let new_distinct_validators = new_validators.iter().filter(|ValidatorReference { pk: validator_pub_key, address: validator_addr} | {
             *validator_pub_key != self.validator_public_key &&
             self.validators.iter()
-                .find(|(existing_validator_pub_key, existing_validator_addr)| 
+                .find(|ValidatorReference { pk: existing_validator_pub_key, address: existing_validator_addr }| 
                     existing_validator_pub_key == validator_pub_key
                 ).is_none()
         });
@@ -44,7 +49,7 @@ impl Configuration {
     }
 
     pub fn find_validator_address_by_key(&self, key: &PublicKeyStr) -> Option<ValidatorAddress> {
-        self.validators.iter().find_map(|(v_pub_k, v_addr)| {
+        self.validators.iter().find_map(|ValidatorReference { pk: v_pub_k, address: v_addr } | {
             if v_pub_k == key {
                 Some(v_addr.clone())
             } else {
@@ -52,8 +57,27 @@ impl Configuration {
             }
         })
     }
+
+    pub fn validator_ref(&self) -> ValidatorReference {
+        ValidatorReference { pk: self.validator_public_key.clone(), address: ValidatorAddress(format!("{}:{}", self.ip, self.port)) }
+    }
+
+    pub fn validator(&self) -> Validator {
+        Validator::from(&self.validator_ref())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ValidatorAddress(pub String);
 
+impl From<&Validator> for ValidatorReference {
+    fn from(v: &Validator) -> Self {
+        ValidatorReference { pk: PublicKeyStr::from_str(&v.public_key), address: ValidatorAddress(v.address.to_owned()) }
+    }
+}
+
+impl From<&ValidatorReference> for Validator {
+    fn from(v: &ValidatorReference) -> Self {
+        Validator { address: v.address.0.to_owned(), public_key: v.pk.0.0.to_owned() }
+    }
+}

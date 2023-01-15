@@ -41,3 +41,9 @@ impl TryFrom<&RsaPublicKey> for PublicKeyStr {
         Ok(PublicKeyStr(HexString(key_str)))
     }
 }
+
+impl From<&PublicKeyStr> for String {
+    fn from(pk: &PublicKeyStr) -> Self {
+        pk.0.0.to_owned()
+    }
+}

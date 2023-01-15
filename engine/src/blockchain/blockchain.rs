@@ -112,4 +112,14 @@ impl BlockChain {
         Ok(hash)
     }
 
+    pub fn index_of_block(&self, hash: &str) -> isize {
+        let mut idx = 0;
+        for block in &self.blocks {
+            if block.hash == hash {
+                return idx;
+            }
+            idx +=1;
+        }
+        -1
+    }
 }

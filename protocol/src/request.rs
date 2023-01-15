@@ -4,15 +4,21 @@ use uuid::Uuid;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Request {
     pub request_id: String,
+    // sender is none if request was done by a client, not a validator
+    pub sender: Option<Validator>,
     pub command: CommandRequest,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum Response {
-    Success {
-        request_id: String,
-        response: CommandResponse,
-    },
+pub struct Response {
+    pub orig_request_id: String,
+    pub replier: Validator,
+    pub body: ResponseBody
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ResponseBody {
+    Success (CommandResponse),
     Error { msg: String },
 }
 
@@ -49,6 +55,9 @@ pub enum CommandRequest {
         validator_signature: ValidatorWithSignature,
         validator: Validator
     },
+    RequestSynchronization {
+        blockchain_tip: String
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -75,7 +84,9 @@ pub enum CommandResponse {
         blocks: Vec<String>
     },
     OnBoardValidatorResponse {
-        validators: Vec<Validator>
+        on_boarding_validator: Validator,
+        validators: Vec<Validator>,
+        blockchain_tip: String
     },
     SynchronizeBlockchainResponse {},
     RequestTransactionValidationResponse {
@@ -86,6 +97,12 @@ pub enum CommandResponse {
         validator_public_key: String,
         transaction_cbor: String,
         validator_signature: String
+    },
+    RequestSynchronizationResponse {
+        previous_hash: String,
+        next_hash: String,
+        transaction_cbor: String,
+        signatures: Vec<ValidatorWithSignature>,
     }
 }
 
@@ -131,25 +148,39 @@ impl CommandRequest {
         }
     }
 
-    pub fn to_request(self) -> Request {
-        Request::new(self)
+    pub fn to_client_request(self) -> Request {
+        Request::new_for_client(self)
     }
 
-    pub fn to_request_with_id(self, request_id: &str) -> Request {
-        Request { request_id: request_id.to_owned(), command: self }
+    pub fn to_request(self, sender: &Validator) -> Request {
+        Request::new(sender, self)
+    }
+
+    pub fn to_request_with_id(self, validator: Validator, request_id: &str) -> Request {
+        Request { sender: Some(validator), request_id: request_id.to_owned(), command: self }
     }
 }
 
 impl Request {
-    pub fn new(command: CommandRequest) -> Self {
+    pub fn new_for_client(command: CommandRequest) -> Self {
         let request_id = Uuid::new_v4().to_string();
         Self {
+            sender: None,
             request_id,
             command,
         }
     }
-    pub fn new_with_id(command: CommandRequest, request_id: &str) -> Self {
+    pub fn new(sender: &Validator, command: CommandRequest) -> Self {
+        let request_id = Uuid::new_v4().to_string();
         Self {
+            sender: Some(sender.clone()),
+            request_id,
+            command,
+        }
+    }
+    pub fn new_with_id(sender: &Validator, command: CommandRequest, request_id: &str) -> Self {
+        Self {
+            sender: Some(sender.clone()),
             request_id: request_id.to_string(),
             command,
         }
