@@ -42,6 +42,34 @@ Make sure all blocks have 3 validations each and they are identical in all nodes
     target/debug/client_print_blockchain -d 0.0.0.0:9068
     ```
 
+    **Example of client_print_blockchain output**
+
+    ```
+    N. Block 1054a462703b08b0311d11d35386d93c0f1b8092cbc3e861ee4cabb1441fd995
+    Input UTxOs:
+        Input 1:
+        Addr: 3082010a0282010100ba....f7a1c148190203010001
+        Amount: 89
+    Output UTxOs:
+        Output 1:
+        Addr: 3082010a0282010100ba....f7a1c148190203010001
+        Amount: 78
+        Output 2:
+        Addr: 3082010a0282010100b9....73909d53bb0203010001
+        Amount: 11
+    Transaction signature: 3e589900d3b254639c74....476bb99cca49b9133cb6
+    Confirmations (total 3):
+        Confirmation 1:
+        Validator Id: 3082010a0282010100a5....d378a976030203010001
+        Signature: 5e28af5493f0cfbc7846....7074937795f523e5a06e
+        Confirmation 2:
+        Validator Id: 3082010a0282010100a7....e38a60c1a70203010001
+        Signature: 606bb7b63a3b72b2a212....08c3dd42ba606d8e5033
+        Confirmation 3:
+        Validator Id: 3082010a0282010100c8....3a2803538b0203010001
+        Signature: 4f3078cc45758cbe16c0....f795228243dadda629c1
+    ```
+
 4. Try to send the same transaction again (redo only 3rd bullet), and you'll see the following
     ```
     # ensure this variable is defined
