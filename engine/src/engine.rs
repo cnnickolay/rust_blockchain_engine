@@ -1,7 +1,7 @@
 use crate::{
     configuration::{Configuration, ValidatorAddress, ValidatorReference},
     model::{PublicKeyStr, PrivateKeyStr},
-    request_handlers::handle_request, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}, client::{send_bytes}, response_handlers::handle_response,
+    request_handlers::handle_request, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, client::{send_bytes}, response_handlers::handle_response,
 };
 use anyhow::Result;
 use protocol::{request::{Request, CommandRequest}, request::{Response, ResponseBody}};
