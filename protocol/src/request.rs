@@ -57,6 +57,10 @@ pub enum CommandRequest {
     },
     RequestSynchronization {
         blockchain_tip: String
+    },
+    AddValidatorSignature {
+        hash: String,
+        validator_signature: ValidatorWithSignature
     }
 }
 
@@ -103,7 +107,8 @@ pub enum CommandResponse {
         next_hash: String,
         transaction_cbor: String,
         signatures: Vec<ValidatorWithSignature>,
-    }
+    },
+    Nothing
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

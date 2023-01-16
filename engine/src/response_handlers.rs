@@ -98,13 +98,22 @@ fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration
                 return ok();
             }
 
+            let synchronisaction_command = CommandRequest::AddValidatorSignature { 
+                hash: block.hash.to_owned(),
+                validator_signature: ValidatorWithSignature::from(validator_signature), 
+            };
+
             let command = CommandRequest::RequestSynchronization {
                 blockchain_tip: block.hash.to_owned(),
             };
             let request = command.to_request(&configuration.validator());
 
-            ok_with_requests(vec![(ValidatorReference::from(replier), request)])
+            ok_with_requests(vec![
+                (ValidatorReference::from(replier), request),
+                (ValidatorReference::from(replier), synchronisaction_command.to_request(&configuration.validator()))
+            ])
         },
+        CommandResponse::Nothing => ok(),
     }
 }
 

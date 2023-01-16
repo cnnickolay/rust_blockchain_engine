@@ -171,6 +171,7 @@ pub fn handle_request(
                 },
             )
         },
+        
         CommandRequest::SynchronizeBlockchain { signatures, transaction_cbor, blockchain_tip_before_transaction, blockchain_tip_after_transaction  } => {
             println!("Synchronization request received");
             let mut blockchain = blockchain.lock().unwrap();
@@ -189,6 +190,7 @@ pub fn handle_request(
 
             success(&request.request_id, configuration.validator(), CommandResponse::SynchronizeBlockchainResponse{})
         },
+
         CommandRequest::PrintBlockchain => {
             let blockchain = blockchain.lock().unwrap();
             let blocks = blockchain.blocks.iter().enumerate().map(|(idx, block)| {
@@ -252,6 +254,19 @@ pub fn handle_request(
                 return err(&request.request_id, configuration.validator(), &err_msg);
             }
         },
+        CommandRequest::AddValidatorSignature { hash, validator_signature } => {
+            print!("Received AddValidatorSignature request");
+            let mut blockchain = blockchain.lock().unwrap();
+            let block_index = blockchain.index_of_block(hash);
+
+            if block_index >= 0 {
+                let block = &mut blockchain.blocks[block_index as usize];
+                block.validator_signatures.push(ValidatorSignature::from(validator_signature));
+            }
+            println!("Added validator signature for {} block", hash);
+
+            no_response(&request.request_id, configuration.validator())
+        },
     }
 }
 
@@ -267,8 +282,11 @@ fn success(request_id: &str, validator: Validator, command_response: CommandResp
         body,
     };
     ok(response)
+}
 
-} 
+fn no_response(request_id: &str, validator: Validator) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
+    success("no-request_id", validator, CommandResponse::Nothing)
+}
 
 fn err(request_id: &str, validator: Validator, msg: &str) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
     let body = ResponseBody::Error { msg: msg.to_owned() };
