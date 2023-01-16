@@ -72,17 +72,25 @@ pub fn run_node(host: String, port: u16, remote_validator_opt: Option<&str>) -> 
             stream.write(&bytes)?;
         } else {
             let mut new_requests = Vec::new();
-            for (ValidatorReference { address, .. }, request) in triggered_requests {
+            for (ValidatorReference { address, pk }, request) in triggered_requests {
                 let blockchain = blockchain.clone();
                 let request_id = request.request_id.clone();
                 println!("Sending triggered request with id {}", request_id);
-                let response = send_bytes(&address.0, request).unwrap();
-                let requests = handle_response(&blockchain, &mut configuration, &request_id, &response)
-                    .unwrap_or_else(|err| {
-                        println !("{}", err); 
-                        Vec::new()
-                    });
-                new_requests.extend(requests);
+
+                match send_bytes(&address.0, request) {
+                    Ok(response) => {
+                        let requests = handle_response(&blockchain, &mut configuration, &request_id, &response)
+                        .unwrap_or_else(|err| {
+                            println !("{}", err); 
+                            Vec::new()
+                        });
+                        new_requests.extend(requests);    
+                    },
+                    Err(err) => {
+                        println!("Unable to reach validator by address {} beacuse of: {}. Validator will be removed", address.0, err);
+                        configuration.remove_validator(&pk);
+                    },
+                }
             }
             triggered_requests = new_requests;
         }

@@ -65,6 +65,20 @@ impl Configuration {
     pub fn validator(&self) -> Validator {
         Validator::from(&self.validator_ref())
     }
+
+    pub fn remove_validator(&mut self, pk: &PublicKeyStr) {
+        let index = self.validators.iter().enumerate().find_map(|(idx, validator)| {
+            if validator.pk == *pk {
+                Some(idx)
+            } else {
+                None
+            }
+        });
+        if let Some(index) = index {
+            self.validators.remove(index);
+            println!("Validator {} removed", pk);
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
