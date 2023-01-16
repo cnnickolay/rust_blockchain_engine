@@ -26,8 +26,8 @@ mod tests {
 
         let block = blockchain.commit_transaction(&signed_transaction, validator_private_key).unwrap();
         assert_eq!(blockchain.blocks.len(), 1, "Number of transactions is wrong");
-        assert_eq!(block.validator_signatures.len(), 1, "Number of signatures is wrong");
-        assert_eq!(block.validator_signatures[0].validator_public_key, *validator_public_key, "Number of signatures is wrong");
+        assert_eq!(block.validator_signatures().len(), 1, "Number of signatures is wrong");
+        assert_eq!(block.validator_signatures()[0].validator_public_key, *validator_public_key, "Number of signatures is wrong");
 
         // second transaction, with change
         let transaction = Transaction::new(&pub_2, &pub_1, 5)

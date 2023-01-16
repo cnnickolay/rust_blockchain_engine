@@ -20,7 +20,7 @@ pub struct Block {
      * Entire block with block hash and transaction hash is signed by validator's private key
      * To resolve contention between validators. 
      */
-    pub validator_signatures: Vec<ValidatorSignature>
+    validator_signatures: Vec<ValidatorSignature>
 }
 
 impl Block {
@@ -49,6 +49,17 @@ impl Block {
         let computed_hash = hasher.finalize().to_vec();
 
         Ok(computed_hash == hex::decode(&self.hash)?)
+    }
+
+    pub fn add_validator_signature(&mut self, signature: ValidatorSignature) {
+        if let Some(_) = self.validator_signatures.iter().find(|_signature| **_signature == signature) {
+            return;
+        }
+        self.validator_signatures.push(signature);
+    }
+
+    pub fn validator_signatures(&self) -> &[ValidatorSignature] {
+        &self.validator_signatures
     }
 }
 

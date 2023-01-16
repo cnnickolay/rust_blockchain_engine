@@ -4,7 +4,7 @@ use clap::{Parser};
 fn main() {
     let args = Args::parse();
 
-    if let Err(err) = run_node(args.host, args.port, args.remote_validator.as_deref()) {
+    if let Err(err) = run_node(args.host, args.port, args.remote_validator.as_deref(), &args.private_key, &args.public_key) {
         println!("Error happened: {}", err)
     }
 
@@ -21,5 +21,11 @@ struct Args {
     port: u16,
 
     #[arg(long, default_value(None))]
-    remote_validator: Option<String>
+    remote_validator: Option<String>,
+
+    #[arg(long)]
+    private_key: String,
+
+    #[arg(long)]
+    public_key: String
 }

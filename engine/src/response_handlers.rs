@@ -42,8 +42,8 @@ fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration
             let last = blockchain.blocks.last_mut().unwrap();
             let validator_signature = ValidatorSignature::new(&PublicKeyStr::from_str(&validator_public_key), &Signature::from_string(&_validator_signature));
             let validator_signature_json = serde_json::to_string_pretty(&validator_signature)?;
-            last.validator_signatures.push(validator_signature);
-            println!("New validation added (total {}) {}", last.validator_signatures.len(), validator_signature_json);
+            last.add_validator_signature(validator_signature);
+            println!("New validation added (total {}) {}", last.validator_signatures().len(), validator_signature_json);
 
             let prev_block = "not needed atm"; // &blockchain.blocks[blockchain.blocks.len() - 2];
             let current_block = &blockchain.blocks[blockchain.blocks.len() - 1];
@@ -89,7 +89,7 @@ fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration
 
             let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&transaction_cbor))?;
             let block = signed_transaction.commit(blockchain, &configuration.validator_private_key)?;
-            let validator_signature = block.validator_signatures.first().ok_or(anyhow!("Transaction wasn't signed by validator"))?;
+            let validator_signature = block.validator_signatures().first().ok_or(anyhow!("Transaction wasn't signed by validator"))?;
 
             println!("Transaction applied, new block hash is {}", block.hash);
 

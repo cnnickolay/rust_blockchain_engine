@@ -5,7 +5,7 @@ use sha1::Digest;
 use sha2::Sha256;
 use super::hex_string::HexString;
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, Eq, Hash)]
 pub struct Signature(pub HexString);
 
 impl Signature {

@@ -1,27 +1,31 @@
 use crate::{
     configuration::{Configuration, ValidatorAddress, ValidatorReference},
-    model::PublicKeyStr,
+    model::{PublicKeyStr, PrivateKeyStr},
     request_handlers::handle_request, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, encryption::{generate_rsa_keypair_custom}, client::{send_bytes}, response_handlers::handle_response,
 };
 use anyhow::Result;
 use protocol::{request::{Request, CommandRequest}, request::{Response, ResponseBody}};
-use rsa::RsaPublicKey;
+use rsa::{RsaPublicKey, RsaPrivateKey};
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream}, sync::{Mutex, Arc}, collections::HashSet,
 };
 
-pub fn run_node(host: String, port: u16, remote_validator_opt: Option<&str>) -> Result<()> {
+pub fn run_node(host: String, port: u16, remote_validator_opt: Option<&str>, private_key: &str, public_key: &str) -> Result<()> {
     let listener = TcpListener::bind(format!("{}:{}", host, port))?;
     println!("Validator node is running on {}:{}", host, port);
 
     // a hardcoded public key for the initial block
     let pub_key_str = PublicKeyStr::from_str("3082010a0282010100bae507cd770270df4e249dfde2a89fe9f6abccbb2e56a82f7ce370c763355c09b596d14734d9e225c3ee913f442aa75ea3dba35edb0ae20bdac52ab8f5451c2dafb93a59dccef395f2dce4069880d8ac1f25300edd09fe61cfe0734efb789fc0c8d8d9f1f916165713f394fc275c2652c69fdbddd43e14b12971683e918dcfb0b97511cb36132acb156235d93aac5f3b46b7ae10445c757ed3ebc6c81c9ae8d496e2ecf948c70a100a10badc68558d121a1240df756c55c8c4c90990c826646dec4e319b55ce15c1e24d9273ea560aeb09834caa0827f99668e81d865a12e059ddaf5987601a7d6c5bfaf14e72182eb83369883a01f9eeb4b09261f7a1c148190203010001");
     let pub_key = RsaPublicKey::try_from(&pub_key_str)?;
-    let (validator_private_key, validator_public_key) = &generate_rsa_keypair_custom()?;
 
-    let mut configuration = Configuration::new(&host, port, validator_private_key);
-    let blockchain = BlockChain::new(validator_public_key, UnspentOutput::initial_utxo(&pub_key_str, 100));
+    let validator_private_key = PrivateKeyStr::from_str(private_key);
+    let validator_public_key = PublicKeyStr::from_str(public_key);
+    RsaPublicKey::try_from(&validator_public_key).expect("Public key provided is wrong");
+    RsaPrivateKey::try_from(&validator_private_key).expect("Private key provided is wrong");
+
+    let mut configuration = Configuration::new(&host, port, &validator_private_key);
+    let blockchain = BlockChain::new(&validator_public_key, UnspentOutput::initial_utxo(&pub_key_str, 100));
     let blockchain = Arc::new(Mutex::new(blockchain));
 
     let mut triggered_requests = Vec::new();

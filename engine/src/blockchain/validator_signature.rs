@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::model::{PublicKeyStr, Signature};
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, PartialEq, Eq, Hash)]
 pub struct ValidatorSignature {
     pub validator_public_key: PublicKeyStr,
     pub validator_signature: Signature

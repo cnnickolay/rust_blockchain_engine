@@ -96,7 +96,7 @@ pub fn handle_request(
             let blockchain_previous_tip = blockchain.blockchain_hash()?;
             let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&signed_transaction_cbor))?;
             let block = signed_transaction.commit(&mut blockchain, &configuration.validator_private_key)?;
-            let validator_signature = block.validator_signatures.first().unwrap();
+            let validator_signature = block.validator_signatures().first().unwrap();
 
             let mut requests = Vec::new();
 
@@ -141,7 +141,7 @@ pub fn handle_request(
             let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&transaction_cbor))?;
             let block = signed_transaction.commit(&mut blockchain, &configuration.validator_private_key)?;
             let blockchain_hash = blockchain.blockchain_hash()?;
-            let validator_signature = block.validator_signatures.first().ok_or(anyhow!("Transaction wasn't signed by validator"))?;
+            let validator_signature = block.validator_signatures().first().ok_or(anyhow!("Transaction wasn't signed by validator"))?;
 
             if *blockchain_new_tip != block.hash {
                 let msg = format!("Blockchain hash is different. Possibility of a hard fork");
@@ -149,12 +149,12 @@ pub fn handle_request(
                 return err(&request.request_id, configuration.validator(), &msg);
             }
 
-            println!("Transaction successfully verified and added to blockchain. Total verifications: {}", block.validator_signatures.len());
+            println!("Transaction successfully verified and added to blockchain. Total verifications: {}", block.validator_signatures().len());
             println!("{}", serde_json::to_string_pretty(&block)?);
 
             // Add signature from the sender validator into the block
             let last = blockchain.blocks.last_mut().unwrap();
-            last.validator_signatures.push(
+            last.add_validator_signature(
                 ValidatorSignature::new(
                     &PublicKeyStr::from_str(&validator.public_key), 
                     &Signature::from_string(&sender_validator_signature.signature)
@@ -186,7 +186,7 @@ pub fn handle_request(
             }
 
             let signature = &signatures[0];
-            last.validator_signatures.push(signature.into());
+            last.add_validator_signature(signature.into());
 
             success(&request.request_id, configuration.validator(), CommandResponse::SynchronizeBlockchainResponse{})
         },
@@ -209,8 +209,8 @@ pub fn handle_request(
                     block_str.push_str(&format!("\n      Amount: {}", output_utxo.amount));
                 }
                 block_str.push_str(&format!("\n  Transaction signature: {}", shorten_long_string(&block.transaction.signature.0.0)));
-                block_str.push_str(&format!("\n  Confirmations (total {}):", block.validator_signatures.len()));
-                for (idx, signature) in block.validator_signatures.iter().enumerate() {
+                block_str.push_str(&format!("\n  Confirmations (total {}):", block.validator_signatures().len()));
+                for (idx, signature) in block.validator_signatures().iter().enumerate() {
                     block_str.push_str(&format!("\n    Confirmation {}:", idx + 1));
                     block_str.push_str(&format!("\n      Validator Id: {}", shorten_long_string(&signature.validator_public_key.0.0)));
                     block_str.push_str(&format!("\n      Signature: {}", shorten_long_string(&signature.validator_signature.0.0)));
@@ -245,7 +245,7 @@ pub fn handle_request(
                     previous_hash, 
                     next_hash, 
                     transaction_cbor: Cbor::try_from(&next_block.transaction)?.0, 
-                    signatures: next_block.validator_signatures.iter().map(|v| ValidatorWithSignature::from(v)).collect() 
+                    signatures: next_block.validator_signatures().iter().map(|v| ValidatorWithSignature::from(v)).collect() 
                 };
 
                 return success(&request.request_id, configuration.validator(), response);
@@ -261,7 +261,7 @@ pub fn handle_request(
 
             if block_index >= 0 {
                 let block = &mut blockchain.blocks[block_index as usize];
-                block.validator_signatures.push(ValidatorSignature::from(validator_signature));
+                block.add_validator_signature(ValidatorSignature::from(validator_signature));
             }
             println!("Added validator signature for {} block", hash);
 

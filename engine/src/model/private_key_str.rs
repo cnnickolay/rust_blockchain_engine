@@ -5,6 +5,12 @@ use super::HexString;
 #[derive(Clone)]
 pub struct PrivateKeyStr(pub String);
 
+impl PrivateKeyStr {
+    pub fn from_str(str: &str) -> Self {
+        PrivateKeyStr(str.to_owned())
+    }
+}
+
 impl TryFrom<&PrivateKeyStr> for RsaPrivateKey {
     type Error = anyhow::Error;
 
