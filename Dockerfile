@@ -4,6 +4,10 @@ COPY . .
 RUN cargo build --release --all
 
 FROM rust:1.66
-RUN apt-get update && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /usr/src/rust-blockchain/target/release/node /usr/local/bin/node
-CMD ["node"]
+RUN apt-get update && apt-get install -y jq && rm -rf /var/lib/apt/lists/*
+ADD test-data /test-data
+ADD /docker-bins /
+RUN chmod +x *.sh
+COPY --from=builder /usr/src/rust-blockchain/target/release/* /usr/local/bin/
+
+CMD ["/validator.sh"]

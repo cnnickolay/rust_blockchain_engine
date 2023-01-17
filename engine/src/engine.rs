@@ -92,7 +92,8 @@ pub fn run_node(host: String, port: u16, remote_validator_opt: Option<&str>, pri
                     },
                     Err(err) => {
                         println!("Unable to reach validator by address {} beacuse of: {}. Validator will be removed", address.0, err);
-                        configuration.remove_validator(&pk);
+                        // need better solution, maybe remove after several failed attempts to send request
+                        // configuration.remove_validator(&pk); 
                     },
                 }
             }

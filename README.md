@@ -75,5 +75,17 @@ Make sure all blocks have 3 validations each and they are identical in all nodes
     External(Error { msg: "Utxo a528b2c8ff24d719973b1a549edc2e0891afa8f923d336f02daa39232c850179 has already been spent" })
     ```
 
+# Docker
+1. Build docker image
+   `/build-docker.sh`
+2. Run serveral validators in containers
+   `docker-compose up`
+3. Sign and submit transaction
+   `docker exec validator-1 /sign-and-submit-transaction.sh`
+4. Send more transactions if necessary
+5. Print blockchain on different validators
+   *. Validator 1: `docker exec validator-1 /client-print-blockchain.sh`
+   *. Validator 2: `docker exec validator-2 /client-print-blockchain.sh`
+
 # Questions and considerations
 Should you have any questions in regards with this project, you can reach out for me at `nickolayc@gmail.com`
