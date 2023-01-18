@@ -1,7 +1,7 @@
 use std::{sync::{Mutex, Arc}};
 
 use protocol::{
-    request::{CommandResponse, CommandRequest, Validator, ValidatorWithSignature, self, Response}, request::{Request, ResponseBody},
+    request::{CommandResponse, CommandRequest, Validator, ValidatorWithSignature, self, Response}, request::{Request, ResponseBody, _PrintValidatorsResponse},
 };
 
 use crate::{
@@ -16,8 +16,13 @@ pub fn handle_request(
     blockchain: Arc<Mutex<BlockChain>>,
     configuration: &mut Configuration,
 ) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
+
+    let _success = |command_response: CommandResponse| {
+        success(&request.request_id, configuration.validator(), command_response)
+    };
+
     match &request.command {
-        protocol::request::CommandRequest::OnBoardValidator { return_address: new_validator_address, public_key: new_validator_public_key } => {
+        CommandRequest::OnBoardValidator { return_address: new_validator_address, public_key: new_validator_public_key } => {
             let blockchain = blockchain.lock().unwrap();
             let mut requests = Vec::new();
 
@@ -56,12 +61,14 @@ pub fn handle_request(
             };
             ok_with_requests(response, requests)
         },
+
         CommandRequest::PingCommand { msg } => {
             println!("Received ping command");
             success(&request.request_id, configuration.validator(), CommandResponse::PingCommandResponse {
                 msg: format!("Original message: {}, PONG PONG", msg),
             })
         },
+
         CommandRequest::GenerateWallet => {
             let (priv_k, pub_k) = &generate_rsa_key_pair()?;
             success(&request.request_id, configuration.validator(), CommandResponse::GenerateWalletResponse {
@@ -69,6 +76,7 @@ pub fn handle_request(
                 public_key: HexString::try_from(pub_k)?.0,
             })
         },
+
         CommandRequest::PrintBalances => {
             let balances =
                     blockchain.lock().unwrap()
@@ -129,6 +137,7 @@ pub fn handle_request(
             };
             ok_with_requests(response, requests)
         },
+
         CommandRequest::RequestTransactionValidation { blockchain_previous_tip, blockchain_new_tip, transaction_cbor, validator_signature: sender_validator_signature, validator } => {
             let mut blockchain = blockchain.lock().unwrap();
             let blockchain_hash = blockchain.blockchain_hash()?;
@@ -254,6 +263,7 @@ pub fn handle_request(
                 return err(&request.request_id, configuration.validator(), &err_msg);
             }
         },
+
         CommandRequest::AddValidatorSignature { hash, validator_signature } => {
             print!("Received AddValidatorSignature request");
             let mut blockchain = blockchain.lock().unwrap();
@@ -266,6 +276,14 @@ pub fn handle_request(
             println!("Added validator signature for {} block", hash);
 
             no_response(&request.request_id, configuration.validator())
+        },
+
+        CommandRequest::PrintValidators => {
+            let buf = String::new();
+
+            _success(CommandResponse::PrintValidatorsResponse(_PrintValidatorsResponse { 
+                validators: configuration.validators.iter().map(|v| Validator::from(v)).collect() 
+            }))
         },
     }
 }

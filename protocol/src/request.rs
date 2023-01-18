@@ -27,6 +27,7 @@ pub enum CommandRequest {
     PingCommand { msg: String },
     GenerateWallet,
     PrintBalances,
+    PrintValidators,
     BalanceTransaction {
         from: String,
         to: String,
@@ -74,8 +75,9 @@ pub enum CommandResponse {
         public_key: String,
     },
     PrintBalancesResponse {
-        balances: Vec<(String, u64)>,
+        balances: Vec<(String, u64)>
     },
+    PrintValidatorsResponse(_PrintValidatorsResponse),
     BalanceTransactionResponse {
         request_id: String,
         body: String,
@@ -109,6 +111,11 @@ pub enum CommandResponse {
         signatures: Vec<ValidatorWithSignature>,
     },
     Nothing
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct _PrintValidatorsResponse {
+    pub validators: Vec<Validator>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

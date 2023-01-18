@@ -86,6 +86,10 @@ Make sure all blocks have 3 validations each and they are identical in all nodes
 5. Print blockchain on different validators
     * Validator 1: `docker exec validator-1 /print-blockchain.sh`
     * Validator 2: `docker exec validator-2 /print-blockchain.sh`
+6. Print node's linked validators. \
+    All nodes are aware of each other. You can check it by calling this command.
+    * `docker exec validator-1 /print-validators.sh`
+    
 
 # Questions and considerations
 Should you have any questions in regards with this project, you can reach out for me at `nickolayc@gmail.com`

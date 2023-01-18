@@ -1,7 +1,8 @@
 use std::{sync::{Arc, Mutex}, borrow::BorrowMut};
 
 use anyhow::{Result, anyhow};
-use protocol::{request::CommandResponse, request::{Request, Response, CommandRequest, ValidatorWithSignature, Validator, ResponseBody}};
+use protocol::{request::CommandResponse, request::{Request, Response, CommandRequest, ValidatorWithSignature, Validator, ResponseBody, _PrintValidatorsResponse}};
+use rand::Error;
 
 use crate::{blockchain::{blockchain::BlockChain, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor}, model::{PublicKeyStr, Signature}, configuration::{ValidatorReference, ValidatorAddress, Configuration}};
 
@@ -73,12 +74,6 @@ fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration
 
             ok_with_requests(requests)
         },
-        CommandResponse::PingCommandResponse { msg } => todo!(),
-        CommandResponse::GenerateWalletResponse { private_key, public_key } => todo!(),
-        CommandResponse::PrintBalancesResponse { balances } => todo!(),
-        CommandResponse::BalanceTransactionResponse { request_id, body, cbor } => todo!(),
-        CommandResponse::CommitTransactionResponse { blockchain_hash } => todo!(),
-        CommandResponse::PrintBlockchainResponse { blocks } => todo!(),
         CommandResponse::RequestSynchronizationResponse { previous_hash, next_hash, transaction_cbor, signatures } => {
             println!("Processing RequestSynchronizationResponse. Base hash {}, expected hash {}", previous_hash, next_hash);
             let current_blockchain_tip = blockchain.blockchain_hash()?;
@@ -114,7 +109,13 @@ fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration
             ])
         },
         CommandResponse::Nothing => ok(),
+        CommandResponse::PrintValidatorsResponse(_) => err_client_command_used_by_node("PrintValidatorsResponse"),
+        client_command => err_client_command_used_by_node(&format!("{:?}", client_command))
     }
+}
+
+fn err_client_command_used_by_node<T>(msg: &str) -> Result<T> {
+    Err(anyhow::anyhow!("This command {} is not supposed to be used by validator", msg))
 }
 
 fn ok() -> Result<Vec<(ValidatorReference, Request)>> {

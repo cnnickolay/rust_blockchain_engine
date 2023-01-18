@@ -27,6 +27,16 @@ impl Client {
         send_bytes(&self.destination, CommandRequest::PrintBalances.to_client_request())
     }
 
+    pub fn print_validators(&self) -> Result<String> {
+        let response = send_bytes(&self.destination, CommandRequest::PrintValidators.to_client_request())?;
+        if let Response {body: ResponseBody::Success (CommandResponse::PrintValidatorsResponse(response)), ..} = response {
+            let validators: Vec<String> = response.validators.iter().map(|v| format!("{} #### {}", v.address, &v.public_key[0..40])).collect();
+            Ok(validators.join("\n"))
+        } else {
+            Err(anyhow!("Unexpected response for print_blockchain: {:?}", response))
+        }
+    }
+
     pub fn balance_transaction(&self, from: &str, to: &str, amount: u64) -> Result<Response> {
         send_bytes(&self.destination, CommandRequest::new_balance_transaction(from, to, amount).to_client_request())
     }
