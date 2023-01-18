@@ -5,6 +5,7 @@ services:
     container_name: validator-1
     image: rust-blockchain:latest
     environment:
+      - RUST_LOG=debug
       - VALIDATOR_CALLBACK=validator-1
       - VALIDATOR_SK=validator-1_private_key
       - VALIDATOR_PK=validator-1_public_key
@@ -13,6 +14,7 @@ services:
     container_name: validator-2
     image: rust-blockchain:latest
     environment:
+      - RUST_LOG=debug
       - VALIDATOR_CALLBACK=validator-2
       - VALIDATOR_SK=validator-2_private_key
       - VALIDATOR_PK=validator-2_public_key
@@ -24,6 +26,7 @@ services:
     container_name: validator-3
     image: rust-blockchain:latest
     environment:
+      - RUST_LOG=debug
       - VALIDATOR_CALLBACK=validator-3
       - VALIDATOR_SK=validator-3_private_key
       - VALIDATOR_PK=validator-3_public_key

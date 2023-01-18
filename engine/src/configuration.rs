@@ -1,3 +1,4 @@
+use log::debug;
 use protocol::request::Validator;
 use rsa::RsaPrivateKey;
 
@@ -76,7 +77,7 @@ impl Configuration {
         });
         if let Some(index) = index {
             self.validators.remove(index);
-            println!("Validator {} removed", pk);
+            debug!("Validator {} removed", pk);
         }
     }
 }

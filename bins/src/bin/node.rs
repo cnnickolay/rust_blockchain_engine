@@ -1,11 +1,14 @@
 use engine::run_node;
-use clap::{Parser};
+use clap::Parser;
+use log::error;
+
 
 fn main() {
+    env_logger::init();
     let args = Args::parse();
 
     if let Err(err) = run_node(args.host, args.port, args.remote_validator.as_deref(), &args.private_key, &args.public_key) {
-        println!("Error happened: {}", err)
+        error!("Error happened: {}", err)
     }
 
     println!("Server stopped");

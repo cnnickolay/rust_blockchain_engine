@@ -1,13 +1,15 @@
 use engine::client::Client;
 use anyhow::Result;
 use clap::Parser;
+use log::error;
 
 
 fn main() {
+    env_logger::init();
     let args = Args::parse();
 
     if let Err(err) = client(&args) {
-        println!("Error happened: {}", err);
+        error!("Error happened: {}", err);
     }
 }
 

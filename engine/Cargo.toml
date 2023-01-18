@@ -16,3 +16,4 @@ sha1 = { version = "0.10.5", default-features = false, features = ["oid"] }
 sha2 = { version = "0.10.6", features = ["oid"] }
 hex = "0.4.3"
 uuid = "1.2.2"
+log = "0.4.17"

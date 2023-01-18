@@ -1,6 +1,7 @@
 use std::{net::TcpStream, io::Write};
 
 use anyhow::{Result, anyhow};
+use log::trace;
 use protocol::{request::Request, request::{CommandResponse, Response, CommandRequest, ResponseBody}};
 use rsa::RsaPrivateKey;
 
@@ -62,7 +63,7 @@ impl Client {
 }
 
 pub fn send_bytes(destination: &str, msg: Request) -> Result<Response> {
-    // println!("Sending {:?}", msg);
+    trace!("Sending {:?}", msg);
     let mut stream = TcpStream::connect(destination)?;
 
     let bytes = serde_cbor::to_vec(&msg)?;

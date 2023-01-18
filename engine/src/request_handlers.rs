@@ -1,5 +1,6 @@
 use std::{sync::{Mutex, Arc}};
 
+use log::{info, trace, debug, error};
 use protocol::{
     request::{CommandResponse, CommandRequest, Validator, ValidatorWithSignature, self, Response}, request::{Request, ResponseBody, _PrintValidatorsResponse},
 };
@@ -33,7 +34,7 @@ pub fn handle_request(
 
             let validator_address = ValidatorAddress(new_validator_address.to_owned());
             configuration.add_validators(&[ValidatorReference { pk: PublicKeyStr::from_str(&new_validator_public_key), address: validator_address } ]);
-            println!(
+            info!(
                 "Added new validator {:?}, total validators {}",
                 new_validator_address,
                 &configuration.validators.len()
@@ -63,7 +64,7 @@ pub fn handle_request(
         },
 
         CommandRequest::PingCommand { msg } => {
-            println!("Received ping command");
+            info!("Received ping command");
             success(&request.request_id, configuration.validator(), CommandResponse::PingCommandResponse {
                 msg: format!("Original message: {}, PONG PONG", msg),
             })
@@ -126,7 +127,7 @@ pub fn handle_request(
                 requests.push((validator.clone(), request));
             }
 
-            println!("{}", serde_json::to_string_pretty(&block)?);
+            trace!("{}", serde_json::to_string_pretty(&block)?);
 
             let response = Response {
                 orig_request_id: request.request_id.to_owned(),
@@ -143,7 +144,7 @@ pub fn handle_request(
             let blockchain_hash = blockchain.blockchain_hash()?;
             if *blockchain_previous_tip != blockchain_hash {
                 let msg = format!("Transaction can't be applied for blockchains are not in sync: {} != {}", blockchain_previous_tip, blockchain_hash);
-                println!("{}", msg);
+                error!("{}", msg);
                 return err(&request.request_id, configuration.validator(), &msg);
             }
 
@@ -154,12 +155,12 @@ pub fn handle_request(
 
             if *blockchain_new_tip != block.hash {
                 let msg = format!("Blockchain hash is different. Possibility of a hard fork");
-                println!("{}", msg);
+                error!("{}", msg);
                 return err(&request.request_id, configuration.validator(), &msg);
             }
 
-            println!("Transaction successfully verified and added to blockchain. Total verifications: {}", block.validator_signatures().len());
-            println!("{}", serde_json::to_string_pretty(&block)?);
+            debug!("Transaction successfully verified and added to blockchain. Total verifications: {}", block.validator_signatures().len());
+            trace!("{}", serde_json::to_string_pretty(&block)?);
 
             // Add signature from the sender validator into the block
             let last = blockchain.blocks.last_mut().unwrap();
@@ -182,7 +183,7 @@ pub fn handle_request(
         },
         
         CommandRequest::SynchronizeBlockchain { signatures, transaction_cbor, blockchain_tip_before_transaction, blockchain_tip_after_transaction  } => {
-            println!("Synchronization request received");
+            debug!("Synchronization request received");
             let mut blockchain = blockchain.lock().unwrap();
             let last = blockchain.blocks.last_mut().unwrap();
 
@@ -231,10 +232,10 @@ pub fn handle_request(
         },
 
         CommandRequest::RequestSynchronization { blockchain_tip } => {
-            println!("Request synchronization received for tip {}", blockchain_tip);
+            debug!("Request synchronization received for tip {}", blockchain_tip);
             let blockchain = blockchain.lock().unwrap();
             let block_index = blockchain.index_of_block(blockchain_tip);
-            println!("Found block at {}", block_index);
+            debug!("Found block at {}", block_index);
 
             if blockchain.blockchain_hash()? == *blockchain_tip {
                 return err(&request.request_id, configuration.validator(), "Fully synchronized");
@@ -273,7 +274,7 @@ pub fn handle_request(
                 let block = &mut blockchain.blocks[block_index as usize];
                 block.add_validator_signature(ValidatorSignature::from(validator_signature));
             }
-            println!("Added validator signature for {} block", hash);
+            debug!("Added validator signature for {} block", hash);
 
             no_response(&request.request_id, configuration.validator())
         },
