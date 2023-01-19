@@ -4,7 +4,7 @@ use crate::{
     request_handlers::handle_request, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, client::send_bytes, response_handlers::handle_response,
 };
 use anyhow::Result;
-use futures::{future::lazy, channel::oneshot, FutureExt};
+use futures::{future::lazy, channel::oneshot::{self, Sender}, FutureExt};
 use log::{info, debug, trace, error};
 use protocol::{request::{Request, CommandRequest}, request::{Response, ResponseBody, CommandResponse}};
 use rsa::{RsaPublicKey, RsaPrivateKey};
@@ -36,7 +36,7 @@ pub async fn run_node(host: String, port: u16, remote_validator_opt: Option<&str
 
     let processed_requests = Arc::new(Mutex::new(HashSet::<String>::new()));
 
-    let (socket_sender, socket_receiver) = mpsc::channel();
+    let (socket_sender, socket_receiver) = mpsc::channel::<(Request, Sender<Response>)>();
     let (requests_sender, requests_receiver) = mpsc::channel::<(ValidatorReference, Request)>();
 
     // Register current validator with other validators
