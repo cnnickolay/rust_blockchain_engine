@@ -1,5 +1,3 @@
-use std::{sync::{Mutex, Arc}};
-
 use log::{info, trace, debug, error};
 use protocol::{
     request::{CommandResponse, CommandRequest, Validator, ValidatorWithSignature, self, Response}, request::{Request, ResponseBody, _PrintValidatorsResponse},
@@ -14,7 +12,7 @@ use anyhow::{Result, anyhow};
 
 pub fn handle_request(
     request: &Request,
-    blockchain: Arc<Mutex<BlockChain>>,
+    blockchain: &mut BlockChain,
     configuration: &mut Configuration,
 ) -> Result<(Response, Vec<(ValidatorReference, Request)>)> {
 
@@ -24,7 +22,6 @@ pub fn handle_request(
 
     match &request.command {
         CommandRequest::OnBoardValidator { return_address: new_validator_address, public_key: new_validator_public_key } => {
-            let blockchain = blockchain.lock().unwrap();
             let mut requests = Vec::new();
 
             for validator in &configuration.validators {
@@ -80,7 +77,7 @@ pub fn handle_request(
 
         CommandRequest::PrintBalances => {
             let balances =
-                    blockchain.lock().unwrap()
+                    blockchain
                         .all_balances()
                         .iter()
                         .map(|(k, v)| (shorten_long_string(&k.0 .0), v.clone()))
@@ -90,7 +87,6 @@ pub fn handle_request(
         },
         
         CommandRequest::BalanceTransaction { from, to, amount } => {
-            let blockchain = blockchain.lock().unwrap();
             let balanced_transaction = &Transaction::new(&PublicKeyStr::from_str(from), &PublicKeyStr::from_str(to), *amount)
                 .balance_transaction(&blockchain)?;
             let cbor_bytes = balanced_transaction.to_cbor()?;
@@ -101,10 +97,9 @@ pub fn handle_request(
         },
 
         CommandRequest::CommitTransaction { signed_transaction_cbor } => {
-            let mut blockchain = blockchain.lock().unwrap();
             let blockchain_previous_tip = blockchain.blockchain_hash()?;
             let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&signed_transaction_cbor))?;
-            let block = signed_transaction.commit(&mut blockchain, &configuration.validator_private_key)?;
+            let block = signed_transaction.commit(blockchain, &configuration.validator_private_key)?;
             let validator_signature = block.validator_signatures().first().unwrap();
 
             let mut requests = Vec::new();
@@ -140,7 +135,6 @@ pub fn handle_request(
         },
 
         CommandRequest::RequestTransactionValidation { blockchain_previous_tip, blockchain_new_tip, transaction_cbor, validator_signature: sender_validator_signature, validator } => {
-            let mut blockchain = blockchain.lock().unwrap();
             let blockchain_hash = blockchain.blockchain_hash()?;
             if *blockchain_previous_tip != blockchain_hash {
                 let msg = format!("Transaction can't be applied for blockchains are not in sync: {} != {}", blockchain_previous_tip, blockchain_hash);
@@ -149,7 +143,7 @@ pub fn handle_request(
             }
 
             let signed_transaction = SignedBalancedTransaction::try_from(&Cbor::new(&transaction_cbor))?;
-            let block = signed_transaction.commit(&mut blockchain, &configuration.validator_private_key)?;
+            let block = signed_transaction.commit(blockchain, &configuration.validator_private_key)?;
             let blockchain_hash = blockchain.blockchain_hash()?;
             let validator_signature = block.validator_signatures().first().ok_or(anyhow!("Transaction wasn't signed by validator"))?;
 
@@ -184,7 +178,6 @@ pub fn handle_request(
         
         CommandRequest::SynchronizeBlockchain { signatures, transaction_cbor, blockchain_tip_before_transaction, blockchain_tip_after_transaction  } => {
             debug!("Synchronization request received");
-            let mut blockchain = blockchain.lock().unwrap();
             let last = blockchain.blocks.last_mut().unwrap();
 
             if last.hash != *blockchain_tip_after_transaction {
@@ -202,7 +195,6 @@ pub fn handle_request(
         },
 
         CommandRequest::PrintBlockchain => {
-            let blockchain = blockchain.lock().unwrap();
             let blocks = blockchain.blocks.iter().enumerate().map(|(idx, block)| {
                 let mut block_str = String::new();
                 block_str.push_str(&format!("{}. Block {}", idx + 1, block.hash));
@@ -233,7 +225,6 @@ pub fn handle_request(
 
         CommandRequest::RequestSynchronization { blockchain_tip } => {
             debug!("Request synchronization received for tip {}", blockchain_tip);
-            let blockchain = blockchain.lock().unwrap();
             let block_index = blockchain.index_of_block(blockchain_tip);
             debug!("Found block at {}", block_index);
 
@@ -267,7 +258,6 @@ pub fn handle_request(
 
         CommandRequest::AddValidatorSignature { hash, validator_signature } => {
             print!("Received AddValidatorSignature request");
-            let mut blockchain = blockchain.lock().unwrap();
             let block_index = blockchain.index_of_block(hash);
 
             if block_index >= 0 {

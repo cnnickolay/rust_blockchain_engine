@@ -3,11 +3,12 @@ use clap::Parser;
 use log::error;
 
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
     let args = Args::parse();
 
-    if let Err(err) = run_node(args.host, args.port, args.remote_validator.as_deref(), &args.private_key, &args.public_key) {
+    if let Err(err) = run_node(args.host, args.port, args.remote_validator.as_deref(), &args.private_key, &args.public_key).await {
         error!("Error happened: {}", err)
     }
 

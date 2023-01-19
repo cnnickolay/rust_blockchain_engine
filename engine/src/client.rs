@@ -17,19 +17,19 @@ impl Client {
     }
 
     pub fn ping(&self, msg: &str) -> Result<Response> {
-        send_bytes(&self.destination, CommandRequest::new_ping(msg).to_client_request())
+        send_bytes(&self.destination, &CommandRequest::new_ping(msg).to_client_request())
     }
 
     pub fn generate_wallet(&self) -> Result<Response> {
-        send_bytes(&self.destination, CommandRequest::GenerateWallet.to_client_request())
+        send_bytes(&self.destination, &CommandRequest::GenerateWallet.to_client_request())
     }
 
     pub fn print_balances(&self) -> Result<Response> {
-        send_bytes(&self.destination, CommandRequest::PrintBalances.to_client_request())
+        send_bytes(&self.destination, &CommandRequest::PrintBalances.to_client_request())
     }
 
     pub fn print_validators(&self) -> Result<String> {
-        let response = send_bytes(&self.destination, CommandRequest::PrintValidators.to_client_request())?;
+        let response = send_bytes(&self.destination, &CommandRequest::PrintValidators.to_client_request())?;
         if let Response {body: ResponseBody::Success (CommandResponse::PrintValidatorsResponse(response)), ..} = response {
             let validators: Vec<String> = response.validators.iter().map(|v| format!("{} #### {}", v.address, &v.public_key[0..40])).collect();
             Ok(validators.join("\n"))
@@ -39,7 +39,7 @@ impl Client {
     }
 
     pub fn balance_transaction(&self, from: &str, to: &str, amount: u64) -> Result<Response> {
-        send_bytes(&self.destination, CommandRequest::new_balance_transaction(from, to, amount).to_client_request())
+        send_bytes(&self.destination, &CommandRequest::new_balance_transaction(from, to, amount).to_client_request())
     }
 
     pub fn commit_transaction(&self, cbor: &str, private_key: &str) -> Result<Response> {
@@ -49,11 +49,11 @@ impl Client {
         let signed_transaction = balanced_transaction.sign(&rsa_private_key)?;
         let signed_cbor: Cbor = (&signed_transaction).try_into()?;
     
-        send_bytes(&self.destination, CommandRequest::new_commit_transaction(&signed_cbor.0).to_client_request())
+        send_bytes(&self.destination, &CommandRequest::new_commit_transaction(&signed_cbor.0).to_client_request())
     }
 
     pub fn print_blockchain(&self) -> Result<String> {
-        let response = send_bytes(&self.destination, CommandRequest::PrintBlockchain.to_client_request())?;
+        let response = send_bytes(&self.destination, &CommandRequest::PrintBlockchain.to_client_request())?;
         if let Response {body: ResponseBody::Success (CommandResponse::PrintBlockchainResponse{blocks}), ..} = response {
             Ok(blocks.join("\n\n"))
         } else {
@@ -62,7 +62,25 @@ impl Client {
     }
 }
 
-pub fn send_bytes(destination: &str, msg: Request) -> Result<Response> {
+pub fn send_bytes_n_attempts(attempts: u8, destination: &str, msg: Request) -> Result<Response> {
+    let mut result: Result<Response> = Err(anyhow!("Bytes were never sent"));
+
+    for i in 0..attempts {
+        match send_bytes(destination, &msg) {
+            Ok(response) => {
+                result = Ok(response);
+                break;
+            },
+            Err(err) => {
+                result = Err(err);
+            }
+        }
+    }
+
+    result.map_err(|err| anyhow!("Number of attempts ({}) to send bytes exchausted: {}", attempts, err))
+}
+
+pub fn send_bytes(destination: &str, msg: &Request) -> Result<Response> {
     trace!("Sending {:?}", msg);
     let mut stream = TcpStream::connect(destination)?;
 

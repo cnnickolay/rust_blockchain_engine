@@ -1,5 +1,3 @@
-use std::{sync::{Arc, Mutex}, borrow::BorrowMut};
-
 use anyhow::{Result, anyhow};
 use log::debug;
 use protocol::{request::CommandResponse, request::{Request, Response, CommandRequest, ValidatorWithSignature, Validator, ResponseBody}};
@@ -8,9 +6,9 @@ use crate::{blockchain::{blockchain::BlockChain, signed_balanced_transaction::Si
 
 use super::blockchain::validator_signature::ValidatorSignature;
 
-pub fn handle_response(blockchain: &Arc<Mutex<BlockChain>>, configuration: &mut Configuration, request_id: &str, response: &Response) -> Result<Vec<(ValidatorReference, Request)>> {
+pub fn handle_response(blockchain: &mut BlockChain, configuration: &mut Configuration, request_id: &str, response: &Response) -> Result<Vec<(ValidatorReference, Request)>> {
     match response {
-        Response { orig_request_id, replier, body: ResponseBody::Success(response) } => handle_command(blockchain.lock().unwrap().borrow_mut(), configuration, request_id, &replier, response),
+        Response { orig_request_id, replier, body: ResponseBody::Success(response) } => handle_command(blockchain, configuration, request_id, &replier, response),
         Response { orig_request_id, replier, body: ResponseBody::Error { msg } } => Err(anyhow!(msg.to_owned())),
     }
 }
