@@ -34,3 +34,15 @@ services:
     depends_on:
       - validator-2
       - validator-1
+    
+  validator-4:
+    container_name: validator-4
+    image: rust-blockchain:latest
+    environment:
+      - RUST_LOG=debug
+      - VALIDATOR_CALLBACK=validator-4
+      - VALIDATOR_SK=validator-4_private_key
+      - VALIDATOR_PK=validator-4_public_key
+      - REMOTE_VALIDATOR=validator-3
+    depends_on:
+      - validator-3
