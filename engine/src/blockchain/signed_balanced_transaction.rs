@@ -1,7 +1,7 @@
 use crate::model::{Signature, PublicKeyStr, PrivateKeyStr};
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
-use super::{utxo::UnspentOutput, blockchain::BlockChain, transaction_id::TransactionId, balanced_transaction::{BalancedTransaction}, cbor::Cbor, block::Block};
+use super::{utxo::UnspentOutput, blockchain::BlockChain, transaction_id::TransactionId, balanced_transaction::{BalancedTransaction}, cbor::Cbor, block::Block, validator_signature::ValidatorSignature};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SignedBalancedTransaction {
@@ -94,6 +94,15 @@ impl TryFrom<&SignedBalancedTransaction> for Cbor {
     type Error = anyhow::Error;
 
     fn try_from(value: &SignedBalancedTransaction) -> Result<Self, Self::Error> {
+        let cbor = serde_cbor::to_vec(value)?;
+        Ok(Cbor(hex::encode(&cbor)))
+    }
+}
+
+impl TryFrom<&ValidatorSignature> for Cbor {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &ValidatorSignature) -> Result<Self, Self::Error> {
         let cbor = serde_cbor::to_vec(value)?;
         Ok(Cbor(hex::encode(&cbor)))
     }

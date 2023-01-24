@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use log::debug;
-use protocol::{request::CommandResponse, request::{Request, Response, CommandRequest, ValidatorWithSignature, Validator, ResponseBody}};
+use protocol::{request::CommandResponse, request::{Request, Response, CommandRequest, ResponseBody}, common::{Validator, ValidatorWithSignature}};
 
 use crate::{blockchain::{blockchain::BlockChain, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor}, model::{PublicKeyStr, Signature}, configuration::{ValidatorReference, ValidatorAddress, Configuration}};
 
@@ -16,17 +16,22 @@ pub fn handle_response(blockchain: &mut BlockChain, configuration: &mut Configur
 fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration, request_id: &str, replier: &Validator, response: &CommandResponse) -> Result<Vec<(ValidatorReference, Request)>> {
     match response {
         CommandResponse::OnBoardValidatorResponse { on_boarding_validator, validators, blockchain_tip } => {
-            let new_validators: Vec<_> = validators.iter().map(|v| ValidatorReference { pk: PublicKeyStr::from_str(&v.public_key), address: ValidatorAddress(v.address.to_owned())}).collect();
-            configuration.add_validators(&new_validators);
+            let new_validators: Vec<ValidatorReference> = validators.iter()
+                .flat_map(|validator| validator.address.clone().map(|addr| ValidatorReference { 
+                    pk: PublicKeyStr::from_str(&validator.public_key), 
+                    address: ValidatorAddress(addr.to_owned())
+                }))
+                .collect();
+            configuration.add_validators(&new_validators[..]);
             debug!("Validators added: {:?}", configuration.validators.iter().map(|validator| &validator.address).collect::<Vec<&ValidatorAddress>>());
 
             let this_blockchain_tip = blockchain.blockchain_hash()?;
             if this_blockchain_tip != *blockchain_tip {
-                let validator = ValidatorReference::from(on_boarding_validator);
+                let on_boarding_validator = ValidatorReference::try_from(on_boarding_validator)?;
                 let command = CommandRequest::RequestSynchronization {
                     blockchain_tip: this_blockchain_tip,
                 };
-                return ok_with_requests(vec![(on_boarding_validator.into(), command.to_request(&configuration.validator()))]);
+                return ok_with_requests(vec![(on_boarding_validator, command.to_request(&configuration.validator()))]);
             }
 
             ok()
@@ -52,7 +57,11 @@ fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration
                     if let Some(validator_address) = configuration.find_validator_address_by_key(validator_pub_key) {
                         let command = CommandRequest::SynchronizeBlockchain {
                             signatures: vec![ValidatorWithSignature { 
-                                validator: Validator { address: validator_address.0.to_owned(), public_key: validator_public_key.to_owned() }, signature: _validator_signature.to_owned() 
+                                validator: Validator { 
+                                    address: Some(validator_address.0.to_owned()), 
+                                    public_key: validator_public_key.to_owned() 
+                                }, 
+                                signature: _validator_signature.to_owned() 
                             }],
                             transaction_cbor: transaction_cbor.to_owned(),
                             blockchain_tip_before_transaction: prev_block.to_owned(),
@@ -72,6 +81,7 @@ fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration
 
             ok_with_requests(requests)
         },
+
         CommandResponse::RequestSynchronizationResponse { previous_hash, next_hash, transaction_cbor, signatures } => {
             debug!("Processing RequestSynchronizationResponse. Base hash {}, expected hash {}", previous_hash, next_hash);
             let current_blockchain_tip = blockchain.blockchain_hash()?;
@@ -102,12 +112,17 @@ fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration
             let request = command.to_request(&configuration.validator());
 
             ok_with_requests(vec![
-                (ValidatorReference::from(replier), request),
-                (ValidatorReference::from(replier), synchronisaction_command.to_request(&configuration.validator()))
+                (ValidatorReference::try_from(replier)?, request),
+                (ValidatorReference::try_from(replier)?, synchronisaction_command.to_request(&configuration.validator()))
             ])
         },
         CommandResponse::Nothing => ok(),
         CommandResponse::PrintValidatorsResponse(_) => err_client_command_used_by_node("PrintValidatorsResponse"),
+
+        CommandResponse::_ResolveBlockContentionResponse(fold_response) => {
+            todo!()
+        },
+
         client_command => err_client_command_used_by_node(&format!("{:?}", client_command))
     }
 }

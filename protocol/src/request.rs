@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::{commands::fold_blocks_command::{ResolveBlockContention, ResolveBlockContentionResult}, common::{ValidatorWithSignature, Validator}};
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Request {
     pub request_id: String,
@@ -62,7 +64,8 @@ pub enum CommandRequest {
     AddValidatorSignature {
         hash: String,
         validator_signature: ValidatorWithSignature
-    }
+    },
+    _ResolveBlockContention (ResolveBlockContention)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -110,24 +113,13 @@ pub enum CommandResponse {
         transaction_cbor: String,
         signatures: Vec<ValidatorWithSignature>,
     },
-    Nothing
+    Nothing,
+    _ResolveBlockContentionResponse (ResolveBlockContentionResult)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct _PrintValidatorsResponse {
     pub validators: Vec<Validator>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Validator {
-    pub address: String,
-    pub public_key: String
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ValidatorWithSignature {
-    pub validator: Validator,
-    pub signature: String
 }
 
 // ################

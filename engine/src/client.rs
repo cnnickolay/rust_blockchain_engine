@@ -31,7 +31,7 @@ impl Client {
     pub fn print_validators(&self) -> Result<String> {
         let response = send_bytes(&self.destination, &CommandRequest::PrintValidators.to_client_request())?;
         if let Response {body: ResponseBody::Success (CommandResponse::PrintValidatorsResponse(response)), ..} = response {
-            let validators: Vec<String> = response.validators.iter().map(|v| format!("{} #### {}", v.address, &v.public_key[0..40])).collect();
+            let validators: Vec<String> = response.validators.iter().map(|v| format!("{} #### {}", v.address.clone().unwrap_or_default(), &v.public_key[0..40])).collect();
             Ok(validators.join("\n"))
         } else {
             Err(anyhow!("Unexpected response for print_blockchain: {:?}", response))

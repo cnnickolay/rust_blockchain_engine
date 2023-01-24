@@ -1,9 +1,9 @@
-use protocol::request::{ValidatorWithSignature, Validator};
-use serde::Serialize;
+use protocol::common::{ValidatorWithSignature, Validator};
+use serde::{Serialize, Deserialize};
 
 use crate::model::{PublicKeyStr, Signature};
 
-#[derive(Clone, Serialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, PartialEq, Eq, Hash, Deserialize)]
 pub struct ValidatorSignature {
     pub validator_public_key: PublicKeyStr,
     pub validator_signature: Signature
@@ -19,7 +19,7 @@ impl From<&ValidatorSignature> for ValidatorWithSignature {
     fn from(v: &ValidatorSignature) -> Self {
         ValidatorWithSignature { 
             validator: Validator { 
-                address: "no-address".to_owned(), 
+                address: None, 
                 public_key: v.validator_public_key.0.0.to_owned(), 
             }, 
             signature: v.validator_signature.0.0.to_owned()

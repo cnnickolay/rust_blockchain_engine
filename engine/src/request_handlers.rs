@@ -1,6 +1,6 @@
 use log::{info, trace, debug, error};
 use protocol::{
-    request::{CommandResponse, CommandRequest, Validator, ValidatorWithSignature, self, Response}, request::{Request, ResponseBody, _PrintValidatorsResponse},
+    request::{CommandResponse, CommandRequest, self, Response}, request::{Request, ResponseBody, _PrintValidatorsResponse}, common::{Validator, ValidatorWithSignature},
 };
 
 use crate::{
@@ -39,20 +39,15 @@ pub fn handle_request(
 
             let mut all_validators: Vec<Validator> = 
                 configuration.validators.iter()
-                .map(|ValidatorReference { pk: public_key, address: addr } | {
-                    Validator { public_key: public_key.0.0.to_owned(), address: addr.0.clone()}
-                })
+                .map(|v_ref | Validator::from(v_ref))
                 .collect();
-            all_validators.push(Validator { 
-                address: format!("{}:{}", configuration.ip, configuration.port), 
-                public_key: configuration.validator_public_key.0.0.to_owned()
-            });
+            all_validators.push(configuration.validator());
 
             let response = Response {
                 orig_request_id: request.request_id.to_owned(),
                 replier: configuration.validator(),
                 body: ResponseBody::Success(CommandResponse::OnBoardValidatorResponse { 
-                    on_boarding_validator: Validator { address: configuration.address(), public_key: String::from(&configuration.validator_public_key) },
+                    on_boarding_validator: configuration.validator(),
                     validators: all_validators, 
                     blockchain_tip: blockchain.blockchain_hash()?
                 }),
@@ -109,14 +104,8 @@ pub fn handle_request(
                     blockchain_previous_tip: blockchain_previous_tip.to_owned(),
                     blockchain_new_tip: block.hash.to_owned(),
                     transaction_cbor: signed_transaction_cbor.to_owned(),
-                    validator_signature: ValidatorWithSignature {
-                        validator: Validator {
-                            address: configuration.address(), 
-                            public_key: configuration.validator_public_key.0.0.to_owned()
-                        },
-                        signature: validator_signature.validator_signature.0.0.to_owned()
-                    },
-                    validator: Validator { address: configuration.address(), public_key: configuration.validator_public_key.0.0.to_owned() },
+                    validator_signature: ValidatorWithSignature::from(validator_signature),
+                    validator: configuration.validator(),
                 }.to_request(&configuration.validator());
 
                 requests.push((validator.clone(), request));
@@ -275,6 +264,9 @@ pub fn handle_request(
             _success(CommandResponse::PrintValidatorsResponse(_PrintValidatorsResponse { 
                 validators: configuration.validators.iter().map(|v| Validator::from(v)).collect() 
             }))
+        },
+        CommandRequest::_ResolveBlockContention(fold_block) => {
+            todo!()
         },
     }
 }

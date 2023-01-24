@@ -1,6 +1,7 @@
 use log::debug;
-use protocol::request::Validator;
+use protocol::common::Validator;
 use rsa::RsaPrivateKey;
+use anyhow::Result;
 
 use crate::model::{PrivateKeyStr, PublicKeyStr};
 
@@ -85,14 +86,23 @@ impl Configuration {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ValidatorAddress(pub String);
 
-impl From<&Validator> for ValidatorReference {
-    fn from(v: &Validator) -> Self {
-        ValidatorReference { pk: PublicKeyStr::from_str(&v.public_key), address: ValidatorAddress(v.address.to_owned()) }
+impl TryFrom<&Validator> for ValidatorReference {
+    type Error = anyhow::Error;
+    fn try_from(v: &Validator) -> Result<Self> {
+        v.address.clone().map(|address| {
+            ValidatorReference { 
+                pk: PublicKeyStr::from_str(&v.public_key), 
+                address: ValidatorAddress(address) 
+            }
+        }).ok_or(anyhow::anyhow!("Unable to convert Validator to ValidatorReference, because there was no ip address included"))
     }
 }
 
 impl From<&ValidatorReference> for Validator {
     fn from(v: &ValidatorReference) -> Self {
-        Validator { address: v.address.0.to_owned(), public_key: v.pk.0.0.to_owned() }
+        Validator { 
+            address: Some(v.address.0.to_owned()), 
+            public_key: v.pk.0.0.to_owned() 
+        }
     }
 }
