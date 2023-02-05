@@ -1,5 +1,5 @@
 use crate::{
-    configuration::{Configuration, ValidatorAddress, ValidatorReference},
+    runtime::configuration::{Configuration, ValidatorAddress, ValidatorReference},
     model::{PublicKeyStr, PrivateKeyStr},
     request_handlers::handle_request, blockchain::{blockchain::BlockChain, utxo::UnspentOutput}, client::send_bytes, response_handlers::handle_response,
 };
@@ -31,7 +31,7 @@ pub async fn run_node(host: String, port: u16, remote_validator_opt: Option<&str
     let configuration = Configuration::new(&host, port, &validator_private_key);
     let validator = configuration.validator();
     let configuration = Arc::new(Mutex::new(configuration));
-    let blockchain = BlockChain::new(&validator_public_key, UnspentOutput::initial_utxo(&pub_key_str, 100));
+    let blockchain = BlockChain::new(UnspentOutput::initial_utxo(&pub_key_str, 100));
     let blockchain = Arc::new(Mutex::new(blockchain));
 
     let processed_requests = Arc::new(Mutex::new(HashSet::<String>::new()));

@@ -22,16 +22,15 @@ pub struct Block {
     pub transaction: SignedBalancedTransaction,
 
     /**
-     * This field points to the validator which was elected to add this block into the blockchain
-     * This validator will get a reward
+     * This field points to the validator which was elected and his signature for the transaction
+     * This validator will append the blockchain with its block and will get a reward
      */
-    original_validator_signature: ValidatorSignature,
+    elected_validator_signature: ValidatorSignature,
 
     /**
-     * Entire block with block hash and transaction hash is signed by validator's private key
-     * To resolve contention between validators. 
+     * Validator signatures for combination of previous block hash and public key of elected validator
      */
-    validator_signatures: Vec<ValidatorSignature>,
+    votes: Vec<ValidatorSignature>
 }
 
 impl Block {
@@ -51,8 +50,8 @@ impl Block {
         Ok(Block {
             hash: next_block_hash, 
             transaction: transaction.clone(), 
-            validator_signatures: vec![original_validator_signature.clone()],
-            original_validator_signature,
+            elected_validator_signature: original_validator_signature,
+            votes: Vec::new(),
         })
     }
 
@@ -66,14 +65,14 @@ impl Block {
     }
 
     pub fn add_validator_signature(&mut self, signature: ValidatorSignature) {
-        if let Some(_) = self.validator_signatures.iter().find(|_signature| **_signature == signature) {
+        if let Some(_) = self.votes.iter().find(|_signature| **_signature == signature) {
             return;
         }
-        self.validator_signatures.push(signature);
+        self.votes.push(signature);
     }
 
     pub fn validator_signatures(&self) -> &[ValidatorSignature] {
-        &self.validator_signatures
+        &self.votes
     }
 }
 

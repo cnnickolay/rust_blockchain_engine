@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{commands::fold_blocks_command::{ResolveBlockContention, ResolveBlockContentionResult}, common::{ValidatorWithSignature, Validator}};
+use crate::common::{ValidatorWithSignature, Validator};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Request {
     pub request_id: String,
+    pub parent_request_id: Option<String>,
     // sender is none if request was done by a client, not a validator
     pub sender: Option<Validator>,
     pub command: CommandRequest,
@@ -65,7 +66,7 @@ pub enum CommandRequest {
         hash: String,
         validator_signature: ValidatorWithSignature
     },
-    _ResolveBlockContention (ResolveBlockContention)
+    BlockchainTip
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -114,7 +115,9 @@ pub enum CommandResponse {
         signatures: Vec<ValidatorWithSignature>,
     },
     Nothing,
-    _ResolveBlockContentionResponse (ResolveBlockContentionResult)
+    BlockchainTipResponse {
+        blockchain_tip_hash: String,
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -124,7 +127,45 @@ pub struct _PrintValidatorsResponse {
 
 // ################
 
+impl CommandResponse {
+    pub fn name(&self) -> String {
+        match self {
+            CommandResponse::PingCommandResponse { .. } => "PingCommandResponse".to_owned(),
+            CommandResponse::GenerateWalletResponse { .. } => "GenerateWalletResponse".to_owned(),
+            CommandResponse::PrintBalancesResponse { .. } => "PrintBalancesResponse".to_owned(),
+            CommandResponse::PrintValidatorsResponse( .. ) => "PrintValidatorsResponse".to_owned(),
+            CommandResponse::BalanceTransactionResponse { .. } => "BalanceTransactionResponse".to_owned(),
+            CommandResponse::CommitTransactionResponse { .. } => "CommitTransactionResponse".to_owned(),
+            CommandResponse::PrintBlockchainResponse { .. } => "PrintBlockchainResponse".to_owned(),
+            CommandResponse::OnBoardValidatorResponse { .. } => "OnBoardValidatorResponse".to_owned(),
+            CommandResponse::SynchronizeBlockchainResponse {  } => "SynchronizeBlockchainResponse".to_owned(),
+            CommandResponse::RequestTransactionValidationResponse { .. } => "RequestTransactionValidationResponse".to_owned(),
+            CommandResponse::RequestSynchronizationResponse { .. } => "RequestSynchronizationResponse".to_owned(),
+            CommandResponse::Nothing => "Nothing".to_owned(),
+            CommandResponse::BlockchainTipResponse { .. } => "BlockchainTipResponse".to_owned(),
+        }
+    }
+}
+
 impl CommandRequest {
+    pub fn name(&self) -> String {
+        match self {
+            CommandRequest::PingCommand { .. } => "PingCommand".to_owned(),
+            CommandRequest::GenerateWallet => "GenerateWallet".to_owned(),
+            CommandRequest::PrintBalances => "PrintBalances".to_owned(),
+            CommandRequest::PrintValidators => "PrintValidators".to_owned(),
+            CommandRequest::BalanceTransaction { .. } => "BalanceTransaction".to_owned(),
+            CommandRequest::CommitTransaction { .. } => "CommitTransaction".to_owned(),
+            CommandRequest::PrintBlockchain => "PrintBlockchain".to_owned(),
+            CommandRequest::OnBoardValidator { .. } => "OnBoardValidator".to_owned(),
+            CommandRequest::SynchronizeBlockchain { .. } => "SynchronizeBlockchain".to_owned(),
+            CommandRequest::RequestTransactionValidation { .. } => "RequestTransactionValidation".to_owned(),
+            CommandRequest::RequestSynchronization { .. } => "RequestSynchronization".to_owned(),
+            CommandRequest::AddValidatorSignature { .. } => "AddValidatorSignature".to_owned(),
+            CommandRequest::BlockchainTip => "BlockchainTip".to_owned(),
+        }
+    }
+
     pub fn new_ping(msg: &str) -> Self {
         Self::PingCommand {
             msg: msg.to_string(),
@@ -161,7 +202,7 @@ impl CommandRequest {
     }
 
     pub fn to_request_with_id(self, validator: Validator, request_id: &str) -> Request {
-        Request { sender: Some(validator), request_id: request_id.to_owned(), command: self }
+        Request { sender: Some(validator), request_id: request_id.to_owned(), command: self, parent_request_id: None }
     }
 }
 
@@ -172,6 +213,7 @@ impl Request {
             sender: None,
             request_id,
             command,
+            parent_request_id: None,
         }
     }
     pub fn new(sender: &Validator, command: CommandRequest) -> Self {
@@ -180,6 +222,7 @@ impl Request {
             sender: Some(sender.clone()),
             request_id,
             command,
+            parent_request_id: None,
         }
     }
     pub fn new_with_id(sender: &Validator, command: CommandRequest, request_id: &str) -> Self {
@@ -187,6 +230,7 @@ impl Request {
             sender: Some(sender.clone()),
             request_id: request_id.to_string(),
             command,
+            parent_request_id: None,
         }
     }
 }

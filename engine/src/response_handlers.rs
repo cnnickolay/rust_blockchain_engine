@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use log::debug;
 use protocol::{request::CommandResponse, request::{Request, Response, CommandRequest, ResponseBody}, common::{Validator, ValidatorWithSignature}};
 
-use crate::{blockchain::{blockchain::BlockChain, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor}, model::{PublicKeyStr, Signature}, configuration::{ValidatorReference, ValidatorAddress, Configuration}};
+use crate::{blockchain::{blockchain::BlockChain, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor}, model::{PublicKeyStr, Signature}, runtime::configuration::{ValidatorReference, ValidatorAddress, Configuration}};
 
 use super::blockchain::validator_signature::ValidatorSignature;
 
@@ -118,10 +118,6 @@ fn handle_command(blockchain: &mut BlockChain, configuration: &mut Configuration
         },
         CommandResponse::Nothing => ok(),
         CommandResponse::PrintValidatorsResponse(_) => err_client_command_used_by_node("PrintValidatorsResponse"),
-
-        CommandResponse::_ResolveBlockContentionResponse(fold_response) => {
-            todo!()
-        },
 
         client_command => err_client_command_used_by_node(&format!("{:?}", client_command))
     }

@@ -22,6 +22,7 @@ pub struct Configuration {
     pub validators: Vec<ValidatorReference>,
 }
 
+
 impl Configuration {
     pub fn new(ip: &str, port: u16, validator_private_key: &PrivateKeyStr) -> Self {
         let rsa_public_key = RsaPrivateKey::try_from(validator_private_key).unwrap().to_public_key();
@@ -35,7 +36,7 @@ impl Configuration {
         }
     }
 
-    pub fn address(&self) -> String {
+    pub fn wrapper(&self) -> String {
         format!("{}:{}", self.ip, self.port)
     }
 
@@ -83,7 +84,7 @@ impl Configuration {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct ValidatorAddress(pub String);
 
 impl TryFrom<&Validator> for ValidatorReference {

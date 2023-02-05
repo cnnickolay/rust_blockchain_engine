@@ -4,7 +4,7 @@ use protocol::{
 };
 
 use crate::{
-    configuration::{Configuration, ValidatorAddress, ValidatorReference},
+    runtime::configuration::{Configuration, ValidatorAddress, ValidatorReference},
     encryption::generate_rsa_key_pair,
     model::{HexString, PublicKeyStr, Signature}, blockchain::{blockchain::BlockChain, transaction::Transaction, signed_balanced_transaction::{SignedBalancedTransaction}, cbor::Cbor, validator_signature::ValidatorSignature}, utils::shorten_long_string,
 };
@@ -265,9 +265,7 @@ pub fn handle_request(
                 validators: configuration.validators.iter().map(|v| Validator::from(v)).collect() 
             }))
         },
-        CommandRequest::_ResolveBlockContention(fold_block) => {
-            todo!()
-        },
+        CommandRequest::BlockchainTip => todo!(),
     }
 }
 

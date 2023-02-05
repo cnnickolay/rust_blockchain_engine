@@ -13,14 +13,14 @@ pub struct BlockChain {
 }
 
 impl BlockChain {
-    pub fn new(validator_public_key: &PublicKeyStr, initial_utxo: UnspentOutput) -> Self {
+    pub fn new(initial_utxo: UnspentOutput) -> Self {
         Self {
             initial_utxo,
             blocks: vec![],
         }
     }
 
-    pub fn new_testing_only(validator_public_key: &PublicKeyStr, initial_utxo: UnspentOutput, blocks: Vec<Block>) -> Self {
+    pub fn new_testing_only(initial_utxo: UnspentOutput, blocks: Vec<Block>) -> Self {
         Self {
             initial_utxo,
             blocks,

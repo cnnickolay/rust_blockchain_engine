@@ -8,7 +8,7 @@ mod tests {
         let (priv_1, pub_1) = &generate_rsa_keypair_custom().unwrap();
         let (priv_2, pub_2) = &generate_rsa_keypair_custom().unwrap();
         
-        let mut blockchain = BlockChain::new(validator_public_key, UnspentOutput::new(&pub_1, 10));
+        let mut blockchain = BlockChain::new(UnspentOutput::new(&pub_1, 10));
         assert_eq!(blockchain.blocks.len(), 0, "Number of transactions is wrong");
         
         // first transaction

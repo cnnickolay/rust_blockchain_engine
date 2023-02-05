@@ -5,15 +5,19 @@ use log::trace;
 use protocol::{request::Request, request::{CommandResponse, Response, CommandRequest, ResponseBody}};
 use rsa::RsaPrivateKey;
 
-use crate::{model::PrivateKeyStr, blockchain::{cbor::Cbor, balanced_transaction::BalancedTransaction}};
+use crate::{model::PrivateKeyStr, blockchain::{cbor::Cbor, balanced_transaction::BalancedTransaction}, runtime::configuration::ValidatorAddress};
 
 pub struct Client {
-    destination: String,
+    pub destination: String,
 }
 
 impl Client {
     pub fn new(destination: &str) -> Self {
         Client { destination: destination.to_string() }
+    }
+
+    pub fn from_address(destination: &ValidatorAddress) -> Self {
+        Client { destination: destination.0.to_owned() }
     }
 
     pub fn ping(&self, msg: &str) -> Result<Response> {
@@ -78,6 +82,10 @@ pub fn send_bytes_n_attempts(attempts: u8, destination: &str, msg: Request) -> R
     }
 
     result.map_err(|err| anyhow!("Number of attempts ({}) to send bytes exchausted: {}", attempts, err))
+}
+
+pub fn send(validator: &ValidatorAddress, msg: &Request) -> Result<Response> {
+    send_bytes(&validator.0, msg)
 }
 
 pub fn send_bytes(destination: &str, msg: &Request) -> Result<Response> {

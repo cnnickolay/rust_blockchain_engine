@@ -1,0 +1,32 @@
+title Proof of Randomness
+
+participant Validator 1
+participant Validator 2
+participant Validator 3
+participant Broadcast
+participant Mempool
+actor User 1
+actor User 2
+User 1->Mempool: sign_and_submit(cbor)
+User 2->Mempool: sign_and_submit(cbor)
+
+note over Broadcast: Broadcast is not an actor, it's a convenient abstraction\nto declutter the diagram. All messages sent to Broadcast\nwill be propagates to all validators of the network.
+
+group Shout
+note over Broadcast: Each validator broadcasts a Shout message\nto declare its presence to other validators
+Validator 1->Broadcast: Shout(block_with_timestamp)
+Broadcast-->Validator 1: Win | Lose(block_with_timestamp)
+Validator 2->Broadcast: Shout(block_with_timestamp)
+Broadcast-->Validator 2: Win | Lose(block_with_timestamp)
+Validator 3->Broadcast: Shout(block_with_timestamp)
+Broadcast-->Validator 3: Win | Lose(block_with_timestamp)
+note over Broadcast: Every validator replies with Win or Lose.\nIn the end the network if fully synchronised\nand every validator knows who's the owner of the next block
+end
+
+group Publishing next block
+note over Broadcast: By this moment, the majority of the network\nshould agree on who's the owner of the next block.\nIf some other validator will propagate next block,\nit will be rejected by the network.
+Validator 1->Mempool: FetchTransactions
+Mempool-->Validator 1: Reply(cbor_transaction...)
+Validator 1->Broadcast: PublishBlock(block)
+Broadcast-->Validator 1: Accepted | Rejected
+end
