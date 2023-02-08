@@ -1,10 +1,14 @@
+pub mod validator_spin_up;
+pub mod request_handler;
+pub mod register_remote_validator;
+
 use super::client_wrappers::ClientWrapper;
 use crate::{runtime::{
         validator_runtime::ValidatorRuntime,
         validator_state::ValidatorState::{Election, Expanse, StartUp},
-    }, model::requests::{Request, CommandRequest, CommandResponse, RegisterRemoteValidatorResponse, ResponseWithRequests, Response, ResponseBody, InternalRequest}, client_wrappers::ClientWrapperImpl};
-use anyhow::Result;
-use log::error;
+    }, model::requests::{Request, CommandRequest, CommandResponse, RegisterRemoteValidatorResponse, ResponseWithRequests, Response, ResponseBody, InternalRequest}, client_wrappers::ClientWrapperImpl, orchestrator::request_handler::RequestHandler};
+use anyhow::{Result, anyhow};
+use log::{error, info, debug};
 
 pub struct RequestProcessor {
     pub client: Box<dyn ClientWrapper + Send + Sync +'static>,
@@ -22,15 +26,23 @@ impl RequestProcessor {
     }
 
     pub fn next_request(&self, request: &Request, rt: &mut ValidatorRuntime) -> Result<ResponseWithRequests> {
+        let validator_ref = rt.configuration.validator_ref();
+        let cmd_to_response = |(cmd, internal_reqs): (CommandResponse, Vec<InternalRequest>)| -> Result<ResponseWithRequests> {
+            Ok(cmd.to_ok_response(&request.request_id, validator_ref).with_requests(internal_reqs))
+        };
+
         match rt.state {
             StartUp => {
                 match &request.command {
-                    CommandRequest::RegisterRemoteValidator(register_validator) => {
-                        let response = CommandResponse::RegisterRemoteValidator(RegisterRemoteValidatorResponse)
-                            .to_ok_response(&request.request_id, rt.configuration.validator_ref());
-                        Ok(response.no_requests())
+                    CommandRequest::RegisterRemoteValidator(cmd) => {
+                        let response = CommandResponse::RegisterRemoteValidator(RegisterRemoteValidatorResponse);
+                        cmd_to_response(cmd.handle_request(request, rt)?)
                     },
                     CommandRequest::BlockchainTip(_) => todo!(),
+                    CommandRequest::ValidatorStarted(cmd) => {
+                        info!("Initializing validator");
+                        cmd_to_response(cmd.handle_request(request, rt)?)
+                    },
                 }
             },
             Election => todo!(),
@@ -42,8 +54,12 @@ impl RequestProcessor {
         match &response.body {
             ResponseBody::Success(response) => {
                 match response {
-                    CommandResponse::RegisterRemoteValidator(_) => todo!(),
+                    CommandResponse::RegisterRemoteValidator(_) => {
+                        debug!("Remote validator registered successfully");
+                        Ok(Vec::new())
+                    },
                     CommandResponse::BlockchainTip(_) => todo!(),
+                    CommandResponse::ValidatorStarted(_) => Err(anyhow!("ValidatorStarted should never be received as a reply"))
                 }
             },
             ResponseBody::Error { msg } => {

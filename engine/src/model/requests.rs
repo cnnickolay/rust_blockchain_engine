@@ -34,7 +34,7 @@ pub struct ResponseWithRequests {
 
 pub struct InternalRequest {
     pub request: Request,
-    pub validator_reference: ValidatorReference
+    pub destination_validator: ValidatorReference
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -51,6 +51,13 @@ impl Response {
             internal_requests: Vec::new(),
         }
     }
+
+    pub fn with_requests(self, requests: Vec<InternalRequest>) -> ResponseWithRequests {
+        ResponseWithRequests {
+            response: self,
+            internal_requests: requests,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -61,6 +68,7 @@ pub enum ResponseBody {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CommandRequest {
+    ValidatorStarted(ValidatorStartedRequest),
     RegisterRemoteValidator(RegisterRemoteValidatorRequest),
     BlockchainTip(BlockchainTipRequest)
 }
@@ -70,10 +78,18 @@ impl CommandRequest {
         Request::new(sender, self)
     }
 
+    pub fn to_internal_request(self, sender: &Validator, destination_validator: &ValidatorReference) -> InternalRequest {
+        InternalRequest {
+            request: self.to_request(sender),
+            destination_validator: destination_validator.clone(),
+        }
+    }
+
     pub fn name(&self) -> String {
         match self {
             CommandRequest::RegisterRemoteValidator(_) => "RegisterRemoteValidator".to_owned(),
             CommandRequest::BlockchainTip(_) => "BlockchainTip".to_owned(),
+            CommandRequest::ValidatorStarted(_) => "ValidatorStarted,".to_owned(),
         } 
     }
 }
@@ -81,7 +97,8 @@ impl CommandRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CommandResponse {
     RegisterRemoteValidator(RegisterRemoteValidatorResponse),
-    BlockchainTip(BlockchainTipResponse)
+    BlockchainTip(BlockchainTipResponse),
+    ValidatorStarted(ValidatorStartedResponse),
 }
 
 impl CommandResponse {
@@ -89,6 +106,7 @@ impl CommandResponse {
         match self {
             CommandResponse::RegisterRemoteValidator(_) => "RegisterRemoteValidator".to_owned(),
             CommandResponse::BlockchainTip(_) => "BlockchainTip".to_owned(),
+            CommandResponse::ValidatorStarted(_) => "ValidatorStarted,".to_owned(),
         } 
     }
 
@@ -110,6 +128,9 @@ pub struct RegisterRemoteValidatorRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockchainTipRequest;
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ValidatorStartedRequest;
+
 // Responses
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RegisterRemoteValidatorResponse;
@@ -118,3 +139,6 @@ pub struct RegisterRemoteValidatorResponse;
 pub struct BlockchainTipResponse {
     pub blockchain_tip_hash: String,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ValidatorStartedResponse;

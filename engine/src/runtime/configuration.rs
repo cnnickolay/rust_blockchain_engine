@@ -70,7 +70,7 @@ impl Configuration {
     }
 
     pub fn to_runtime(self, blockchain: BlockChain, remote_validators: Vec<ValidatorReference>) -> ValidatorRuntime {
-        ValidatorRuntime::new(self, blockchain)
+        ValidatorRuntime::new(self, blockchain, remote_validators)
     }
 }
 

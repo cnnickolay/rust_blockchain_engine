@@ -1,12 +1,12 @@
-use std::{env, rc::Rc, sync::Arc};
+use std::{env, thread, time::Duration};
 
-use engine::{encryption::generate_rsa_keypair_custom, blockchain::utxo::UnspentOutput, runtime::{configuration::Configuration, validator_runtime::ValidatorRuntime}, client_wrappers::{ClientWrapperImpl, ClientWrapper}, orchestrator::RequestProcessor};
+use engine::{encryption::generate_rsa_keypair_custom, blockchain::utxo::UnspentOutput, runtime::{configuration::Configuration}};
 use anyhow::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "trace")
+        env::set_var("RUST_LOG", "debug")
     }
     env_logger::init();
 
@@ -24,6 +24,8 @@ async fn main() -> Result<()> {
             .await
     });
 
+    thread::sleep(Duration::from_secs(1));
+
     let initial_pk_cloned = initial_pk.clone();
     let validator_2_future = tokio::spawn(async move {
         validator_2
@@ -31,8 +33,6 @@ async fn main() -> Result<()> {
             .run()
             .await;
     });
-
-    println!("Server stopped");
 
     let (validator_1_future_result, validator_2_future_result) = tokio::join!(validator_1_future, validator_2_future);
     validator_1_future_result?;

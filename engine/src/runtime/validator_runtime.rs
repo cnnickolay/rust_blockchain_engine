@@ -1,4 +1,4 @@
-use std::{sync::{mpsc, Arc, Mutex}, rc::Rc, thread, ops::Deref};
+use std::{sync::{mpsc, Arc, Mutex}, rc::Rc, thread, ops::Deref, time::Duration};
 
 use super::{
     configuration::{Configuration, ValidatorAddress, ValidatorReference},
@@ -6,9 +6,10 @@ use super::{
 };
 use crate::{
     blockchain::{blockchain::BlockChain, uuid::Uuid},
-    model::{PublicKeyStr, requests::{Request, Response, ResponseWithRequests, InternalRequest}}, client_wrappers::{ClientWrapper, ClientWrapperImpl, send}, orchestrator::RequestProcessor
+    model::{PublicKeyStr, requests::{Request, Response, ResponseWithRequests, InternalRequest, CommandRequest, ValidatorStartedRequest}}, client_wrappers::{ClientWrapper, ClientWrapperImpl, send}, orchestrator::RequestProcessor
 };
 use anyhow::Result;
+use futures::executor;
 use log::{debug, trace, info};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -24,11 +25,11 @@ pub struct ValidatorRuntime {
 }
 
 impl ValidatorRuntime {
-    pub fn new(configuration: Configuration, blockchain: BlockChain) -> ValidatorRuntime {
+    pub fn new(configuration: Configuration, blockchain: BlockChain, validators: Vec<ValidatorReference>) -> ValidatorRuntime {
         ValidatorRuntime {
             configuration,
             state: ValidatorState::StartUp,
-            validators: Vec::new(),
+            validators,
             processed_events: Vec::new(),
             blockchain,
         }
@@ -38,8 +39,16 @@ impl ValidatorRuntime {
         info!("Running validator on {}", self.configuration.address());
         let listener = TcpListener::bind(self.configuration.address()).await.unwrap();
 
-        let (socket_request_sender, socket_request_receiver) = mpsc::channel::<(Request, TcpStream)>();
+        let (socket_request_sender, socket_request_receiver) = mpsc::channel::<(Request, Option<TcpStream>)>();
         let (internal_request_sender, internal_request_receiver) = mpsc::channel::<InternalRequest>();
+
+        // sending ValidatorStarted message to itself
+        socket_request_sender.send(
+            (
+                CommandRequest::ValidatorStarted(ValidatorStartedRequest).to_request(&self.configuration.validator()),
+                None
+            )
+        ).unwrap();
 
         let validator = Arc::new(Mutex::new(self));
 
@@ -53,52 +62,71 @@ impl ValidatorRuntime {
                 tokio::spawn(async move {
                     let request = ValidatorRuntime::receive_and_parse(&mut socket).await.unwrap();
                     info!("Received request: {:?}", request);
-                    request_sender_from_socket.send((request, socket)).unwrap();
+                    request_sender_from_socket.send((request, Some(socket))).unwrap();
                 });
             }
         });
 
         let internal_request_validator = validator.clone();
         let internal_sub_request_sender = internal_request_sender.clone();
-        tokio::spawn(async move {
-            internal_request_receiver.iter().for_each(|InternalRequest {request: internal_request, validator_reference: destination}| {
-    
-                let internal_request_validator = internal_request_validator.clone();
-                let internal_sub_request_sender = internal_sub_request_sender.clone();
-                tokio::spawn(async move {
-                    let internal_response = send(&destination.address, &internal_request).unwrap();
-    
-                    let internal_sub_requests = RequestProcessor::prod().process_response(
-                        &internal_request, 
-                        &internal_response, 
-                        &mut internal_request_validator.lock().unwrap()
-                    ).unwrap();
+        let internal_request_future = tokio::spawn(async move {
+            loop {
 
-                    for internal_sub_request in internal_sub_requests {
-                        internal_sub_request_sender.send(internal_sub_request).unwrap();
+                for InternalRequest {request: internal_request, destination_validator: destination} in &internal_request_receiver {
+                    debug!("Internal request received: {}", internal_request.command.name());
+    
+                    let internal_request_validator = internal_request_validator.clone();
+                    let internal_sub_request_sender = internal_sub_request_sender.clone();
+
+                    thread::spawn(move || {
+                        debug!("Sending internal request to {}", destination.address.0);
+                        let internal_response = send(&destination.address, &internal_request).unwrap();
+        
+                        let internal_sub_requests = RequestProcessor::prod().process_response(
+                            &internal_request, 
+                            &internal_response, 
+                            &mut internal_request_validator.lock().unwrap()
+                        ).unwrap();
+    
+                        for internal_sub_request in internal_sub_requests {
+                            internal_sub_request_sender.send(internal_sub_request).unwrap();
+                        }
+                    });
+                }
+            }
+        });
+
+        let external_request_validator = validator.clone();
+        let external_request_future = tokio::spawn(async move {
+            loop {
+                socket_request_receiver.iter().for_each(|(request, socket)| {
+                    info!("Request added to queue: {}", request.command.name());
+        
+                    let ResponseWithRequests { response, internal_requests } = 
+                            RequestProcessor::prod()
+                                .next_request(&request, &mut external_request_validator.lock().unwrap())
+                                .expect(&format!("Error happened while processing external request: {:?}", request));
+    
+                    debug!("Response generated: {:?}", response);
+    
+                    if let Some(mut socket) = socket {
+                        let result = serde_cbor::to_vec(&response).unwrap();
+                        thread::spawn(move || {
+                            executor::block_on(socket.write(&result)).unwrap();
+                            debug!("Response sent out");
+                        });
+                    };
+            
+                    debug!("Total internal requests: {}", internal_requests.len());
+                    for internal_request in internal_requests {
+                        debug!("Internal request to {:?}: {:?}", internal_request.destination_validator, internal_request.request);
+                        internal_request_sender.send(internal_request).unwrap();
                     }
                 });
-            });
+            }
         });
 
-        socket_request_receiver.iter().for_each(move |(request, mut socket)| {
-            info!("Request added to queue: {:?}", request);
-
-            let internal_request_sender = internal_request_sender.clone();
-            let validator = validator.clone();
-            tokio::spawn(async move {
-                let ResponseWithRequests { response, internal_requests } = 
-                    RequestProcessor::prod().next_request(&request, &mut validator.lock().unwrap())
-                        .expect(&format!("Error happened while processing external request: {:?}", request));
-    
-                let result = serde_cbor::to_vec(&response).unwrap();
-                socket.write(&result).await.unwrap();
-
-                for internal_request in internal_requests {
-                    internal_request_sender.send(internal_request).unwrap();
-                }
-            });
-        });
+        internal_request_future.await.unwrap();
     }
 
     /**
