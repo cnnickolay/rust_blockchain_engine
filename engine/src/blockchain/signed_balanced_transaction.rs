@@ -1,7 +1,10 @@
-use crate::model::{Signature, PublicKeyStr, PrivateKeyStr};
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
-use super::{utxo::UnspentOutput, blockchain::BlockChain, transaction_id::TransactionId, balanced_transaction::{BalancedTransaction}, cbor::Cbor, block::Block, validator_signature::ValidatorSignature};
+use super::{
+    balanced_transaction::BalancedTransaction, block::Block, blockchain::BlockChain, cbor::Cbor,
+    transaction_id::TransactionId, utxo::UnspentOutput, validator_signature::ValidatorSignature,
+};
+use crate::model::{PrivateKeyStr, PublicKeyStr, Signature};
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SignedBalancedTransaction {
@@ -10,8 +13,10 @@ pub struct SignedBalancedTransaction {
 }
 
 impl SignedBalancedTransaction {
-
-    pub fn new(balanced_transaction: &BalancedTransaction, signature: &Signature) -> SignedBalancedTransaction {
+    pub fn new(
+        balanced_transaction: &BalancedTransaction,
+        signature: &Signature,
+    ) -> SignedBalancedTransaction {
         SignedBalancedTransaction {
             balanced_transaction: balanced_transaction.clone(),
             signature: signature.clone(),
@@ -64,14 +69,18 @@ impl SignedBalancedTransaction {
                 if *address != input.address {
                     return Err(anyhow!("Transaction has multiple input addresses, this feature is not supported yet"));
                 }
-                
+
                 address = &input.address;
             }
             Ok(address)
         }
     }
 
-    pub fn commit(&self, blockchain: &mut BlockChain, validator_private_key: &PrivateKeyStr) -> Result<Block> {
+    pub fn commit(
+        &self,
+        blockchain: &mut BlockChain,
+        validator_private_key: &PrivateKeyStr,
+    ) -> Result<Block> {
         let block = blockchain.commit_transaction(self, validator_private_key)?;
         Ok(block)
     }

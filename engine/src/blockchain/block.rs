@@ -1,12 +1,15 @@
+use crate::model::{PrivateKeyStr, PublicKeyStr, Signature};
+use anyhow::Result;
 use protocol::common::ValidatorWithSignature;
 use rsa::RsaPrivateKey;
 use serde::Serialize;
 use sha1::Digest;
 use sha2::Sha256;
-use anyhow::Result;
-use crate::model::{Signature, PublicKeyStr, PrivateKeyStr};
 
-use super::{signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor, validator_signature::ValidatorSignature};
+use super::{
+    cbor::Cbor, signed_balanced_transaction::SignedBalancedTransaction,
+    validator_signature::ValidatorSignature,
+};
 
 #[derive(Clone, Serialize)]
 pub struct Block {
@@ -30,16 +33,21 @@ pub struct Block {
     /**
      * Validator signatures for combination of previous block hash and public key of elected validator
      */
-    votes: Vec<ValidatorSignature>
+    votes: Vec<ValidatorSignature>,
 }
 
 impl Block {
-    pub fn create_block_and_sign(previous_block_hash: &[u8], transaction: &SignedBalancedTransaction, validator_private_key: &PrivateKeyStr) -> Result<Block> {
+    pub fn create_block_and_sign(
+        previous_block_hash: &[u8],
+        transaction: &SignedBalancedTransaction,
+        validator_private_key: &PrivateKeyStr,
+    ) -> Result<Block> {
         let private_key = RsaPrivateKey::try_from(validator_private_key)?;
         let public_key = PublicKeyStr::try_from(&private_key.to_public_key())?;
         let transaction_cbor = hex::decode(Cbor::try_from(transaction)?.0)?;
         let validator_signature = Signature::sign(&private_key, &transaction_cbor)?;
-        let original_validator_signature = ValidatorSignature::new(&public_key, &validator_signature);
+        let original_validator_signature =
+            ValidatorSignature::new(&public_key, &validator_signature);
 
         let mut hasher = Sha256::new();
         hasher.update(previous_block_hash);
@@ -48,8 +56,8 @@ impl Block {
         let next_block_hash = hex::encode(hasher.finalize().to_vec());
 
         Ok(Block {
-            hash: next_block_hash, 
-            transaction: transaction.clone(), 
+            hash: next_block_hash,
+            transaction: transaction.clone(),
             elected_validator_signature: original_validator_signature,
             votes: Vec::new(),
         })
@@ -65,7 +73,11 @@ impl Block {
     }
 
     pub fn add_validator_signature(&mut self, signature: ValidatorSignature) {
-        if let Some(_) = self.votes.iter().find(|_signature| **_signature == signature) {
+        if let Some(_) = self
+            .votes
+            .iter()
+            .find(|_signature| **_signature == signature)
+        {
             return;
         }
         self.votes.push(signature);
@@ -80,7 +92,7 @@ impl From<&ValidatorWithSignature> for ValidatorSignature {
     fn from(v: &ValidatorWithSignature) -> Self {
         ValidatorSignature::new(
             &PublicKeyStr::from_str(&v.validator.public_key),
-            &Signature::from_string(&v.signature)
+            &Signature::from_string(&v.signature),
         )
     }
 }

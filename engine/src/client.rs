@@ -1,11 +1,18 @@
-use std::{net::TcpStream, io::Write};
+use std::{io::Write, net::TcpStream};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use log::trace;
-use protocol::{request::Request, request::{CommandResponse, Response, CommandRequest, ResponseBody}};
+use protocol::{
+    request::Request,
+    request::{CommandRequest, CommandResponse, Response, ResponseBody},
+};
 use rsa::RsaPrivateKey;
 
-use crate::{model::PrivateKeyStr, blockchain::{cbor::Cbor, balanced_transaction::BalancedTransaction}, runtime::configuration::ValidatorAddress};
+use crate::{
+    blockchain::{balanced_transaction::BalancedTransaction, cbor::Cbor},
+    model::PrivateKeyStr,
+    runtime::configuration::ValidatorAddress,
+};
 
 pub struct Client {
     pub destination: String,
@@ -13,37 +20,73 @@ pub struct Client {
 
 impl Client {
     pub fn new(destination: &str) -> Self {
-        Client { destination: destination.to_string() }
+        Client {
+            destination: destination.to_string(),
+        }
     }
 
     pub fn from_address(destination: &ValidatorAddress) -> Self {
-        Client { destination: destination.0.to_owned() }
+        Client {
+            destination: destination.0.to_owned(),
+        }
     }
 
     pub fn ping(&self, msg: &str) -> Result<Response> {
-        send_bytes(&self.destination, &CommandRequest::new_ping(msg).to_client_request())
+        send_bytes(
+            &self.destination,
+            &CommandRequest::new_ping(msg).to_client_request(),
+        )
     }
 
     pub fn generate_wallet(&self) -> Result<Response> {
-        send_bytes(&self.destination, &CommandRequest::GenerateWallet.to_client_request())
+        send_bytes(
+            &self.destination,
+            &CommandRequest::GenerateWallet.to_client_request(),
+        )
     }
 
     pub fn print_balances(&self) -> Result<Response> {
-        send_bytes(&self.destination, &CommandRequest::PrintBalances.to_client_request())
+        send_bytes(
+            &self.destination,
+            &CommandRequest::PrintBalances.to_client_request(),
+        )
     }
 
     pub fn print_validators(&self) -> Result<String> {
-        let response = send_bytes(&self.destination, &CommandRequest::PrintValidators.to_client_request())?;
-        if let Response {body: ResponseBody::Success (CommandResponse::PrintValidatorsResponse(response)), ..} = response {
-            let validators: Vec<String> = response.validators.iter().map(|v| format!("{} #### {}", v.address.clone().unwrap_or_default(), &v.public_key[0..40])).collect();
+        let response = send_bytes(
+            &self.destination,
+            &CommandRequest::PrintValidators.to_client_request(),
+        )?;
+        if let Response {
+            body: ResponseBody::Success(CommandResponse::PrintValidatorsResponse(response)),
+            ..
+        } = response
+        {
+            let validators: Vec<String> = response
+                .validators
+                .iter()
+                .map(|v| {
+                    format!(
+                        "{} #### {}",
+                        v.address.clone().unwrap_or_default(),
+                        &v.public_key[0..40]
+                    )
+                })
+                .collect();
             Ok(validators.join("\n"))
         } else {
-            Err(anyhow!("Unexpected response for print_blockchain: {:?}", response))
+            Err(anyhow!(
+                "Unexpected response for print_blockchain: {:?}",
+                response
+            ))
         }
     }
 
     pub fn balance_transaction(&self, from: &str, to: &str, amount: u64) -> Result<Response> {
-        send_bytes(&self.destination, &CommandRequest::new_balance_transaction(from, to, amount).to_client_request())
+        send_bytes(
+            &self.destination,
+            &CommandRequest::new_balance_transaction(from, to, amount).to_client_request(),
+        )
     }
 
     pub fn commit_transaction(&self, cbor: &str, private_key: &str) -> Result<Response> {
@@ -52,16 +95,29 @@ impl Client {
 
         let signed_transaction = balanced_transaction.sign(&rsa_private_key)?;
         let signed_cbor: Cbor = (&signed_transaction).try_into()?;
-    
-        send_bytes(&self.destination, &CommandRequest::new_commit_transaction(&signed_cbor.0).to_client_request())
+
+        send_bytes(
+            &self.destination,
+            &CommandRequest::new_commit_transaction(&signed_cbor.0).to_client_request(),
+        )
     }
 
     pub fn print_blockchain(&self) -> Result<String> {
-        let response = send_bytes(&self.destination, &CommandRequest::PrintBlockchain.to_client_request())?;
-        if let Response {body: ResponseBody::Success (CommandResponse::PrintBlockchainResponse{blocks}), ..} = response {
+        let response = send_bytes(
+            &self.destination,
+            &CommandRequest::PrintBlockchain.to_client_request(),
+        )?;
+        if let Response {
+            body: ResponseBody::Success(CommandResponse::PrintBlockchainResponse { blocks }),
+            ..
+        } = response
+        {
             Ok(blocks.join("\n\n"))
         } else {
-            Err(anyhow!("Unexpected response for print_blockchain: {:?}", response))
+            Err(anyhow!(
+                "Unexpected response for print_blockchain: {:?}",
+                response
+            ))
         }
     }
 }
@@ -74,14 +130,20 @@ pub fn send_bytes_n_attempts(attempts: u8, destination: &str, msg: Request) -> R
             Ok(response) => {
                 result = Ok(response);
                 break;
-            },
+            }
             Err(err) => {
                 result = Err(err);
             }
         }
     }
 
-    result.map_err(|err| anyhow!("Number of attempts ({}) to send bytes exchausted: {}", attempts, err))
+    result.map_err(|err| {
+        anyhow!(
+            "Number of attempts ({}) to send bytes exchausted: {}",
+            attempts,
+            err
+        )
+    })
 }
 
 pub fn send(validator: &ValidatorAddress, msg: &Request) -> Result<Response> {
@@ -101,4 +163,3 @@ pub fn send_bytes(destination: &str, msg: &Request) -> Result<Response> {
 
     Ok(response)
 }
-

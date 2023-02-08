@@ -1,8 +1,7 @@
-use engine::client::Client;
 use anyhow::Result;
 use clap::Parser;
+use engine::client::Client;
 use log::error;
-
 
 fn main() {
     env_logger::init();

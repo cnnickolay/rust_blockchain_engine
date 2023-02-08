@@ -1,4 +1,3 @@
-
 /**
  * Every node broadcasts a Shout message to other validators
  */
@@ -11,8 +10,6 @@ pub struct Shout {
 }
 
 /**
- * 
+ *
  */
-pub struct DeclareBlockOwner {
-
-}
+pub struct DeclareBlockOwner {}

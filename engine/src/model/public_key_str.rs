@@ -1,19 +1,21 @@
 use std::fmt::{Display, Formatter};
 
-use rsa::{RsaPublicKey, pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey}};
-use serde::{Serialize, Deserialize};
+use rsa::{
+    pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey},
+    RsaPublicKey,
+};
+use serde::{Deserialize, Serialize};
 
 use crate::utils::shorten_long_string;
 
 use super::hex_string::HexString;
-
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct PublicKeyStr(pub HexString);
 
 impl Display for PublicKeyStr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", shorten_long_string(&self.0.0))
+        write!(f, "{}", shorten_long_string(&self.0 .0))
     }
 }
 
@@ -44,6 +46,6 @@ impl TryFrom<&RsaPublicKey> for PublicKeyStr {
 
 impl From<&PublicKeyStr> for String {
     fn from(pk: &PublicKeyStr) -> Self {
-        pk.0.0.to_owned()
+        pk.0 .0.to_owned()
     }
 }

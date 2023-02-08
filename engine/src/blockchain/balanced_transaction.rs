@@ -1,9 +1,12 @@
-use rsa::RsaPrivateKey;
-use serde::{Serialize, Deserialize};
-use anyhow::Result;
 use crate::model::Signature;
+use anyhow::Result;
+use rsa::RsaPrivateKey;
+use serde::{Deserialize, Serialize};
 
-use super::{utxo::UnspentOutput, transaction_id::TransactionId, signed_balanced_transaction::SignedBalancedTransaction, cbor::Cbor};
+use super::{
+    cbor::Cbor, signed_balanced_transaction::SignedBalancedTransaction,
+    transaction_id::TransactionId, utxo::UnspentOutput,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BalancedTransaction {

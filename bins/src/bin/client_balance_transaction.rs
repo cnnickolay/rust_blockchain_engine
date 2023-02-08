@@ -1,8 +1,7 @@
-use engine::client::Client;
 use anyhow::Result;
 use clap::Parser;
+use engine::client::Client;
 use log::error;
-
 
 fn main() {
     env_logger::init();
@@ -15,8 +14,12 @@ fn main() {
 
 fn client(args: &Args) -> Result<()> {
     let client = Client::new(&args.destination);
-    let balanced_transaction_response = client.balance_transaction(&args.from_address, &args.to_address, args.amount)?;
-    println!("{}", serde_json::to_string_pretty(&balanced_transaction_response)?);
+    let balanced_transaction_response =
+        client.balance_transaction(&args.from_address, &args.to_address, args.amount)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&balanced_transaction_response)?
+    );
     Ok(())
 }
 

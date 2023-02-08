@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use super::uuid::Uuid;
 
@@ -13,5 +13,4 @@ impl TransactionId {
     pub fn generate() -> TransactionId {
         TransactionId(Uuid::generate())
     }
-
 }

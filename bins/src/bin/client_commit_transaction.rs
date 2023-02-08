@@ -1,8 +1,7 @@
-use engine::client::Client;
 use anyhow::Result;
 use clap::Parser;
+use engine::client::Client;
 use log::error;
-
 
 fn main() {
     env_logger::init();
@@ -15,7 +14,10 @@ fn main() {
 
 fn client(args: &Args) -> Result<()> {
     let client = Client::new(&args.destination);
-    println!("{:?}", client.commit_transaction(&args.cbor, &args.private_key)?);
+    println!(
+        "{:?}",
+        client.commit_transaction(&args.cbor, &args.private_key)?
+    );
     Ok(())
 }
 

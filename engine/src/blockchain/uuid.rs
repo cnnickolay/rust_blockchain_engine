@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
-use uuid::{Uuid as _Uuid};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid as _Uuid;
 
 #[derive(Clone, Eq, Hash, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Uuid(pub String);

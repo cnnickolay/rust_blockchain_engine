@@ -1,5 +1,5 @@
 use rsa::{RsaPrivateKey, RsaPublicKey};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct HexString(pub String);

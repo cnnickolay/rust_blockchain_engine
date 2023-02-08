@@ -1,10 +1,11 @@
-
 use std::collections::HashSet;
 
-use crate::model::{PublicKeyStr, PrivateKeyStr};
+use crate::model::{PrivateKeyStr, PublicKeyStr};
 
-use super::{utxo::UnspentOutput, signed_balanced_transaction::{SignedBalancedTransaction}, block::Block};
-use anyhow::{Result, anyhow};
+use super::{
+    block::Block, signed_balanced_transaction::SignedBalancedTransaction, utxo::UnspentOutput,
+};
+use anyhow::{anyhow, Result};
 use rsa::RsaPublicKey;
 
 pub struct BlockChain {
@@ -46,7 +47,11 @@ impl BlockChain {
         Ok(())
     }
 
-    pub fn commit_transaction(&mut self, transaction: &SignedBalancedTransaction, validator_private_key: &PrivateKeyStr) -> Result<Block> {
+    pub fn commit_transaction(
+        &mut self,
+        transaction: &SignedBalancedTransaction,
+        validator_private_key: &PrivateKeyStr,
+    ) -> Result<Block> {
         self.verify_transaction(&transaction)?;
 
         let previous_block_hash = if self.blocks.is_empty() {
@@ -55,7 +60,8 @@ impl BlockChain {
             hex::decode(&self.blocks.last().unwrap().hash)?
         };
 
-        let block = Block::create_block_and_sign(&previous_block_hash, transaction, validator_private_key)?;
+        let block =
+            Block::create_block_and_sign(&previous_block_hash, transaction, validator_private_key)?;
 
         self.blocks.push(block.clone());
 
@@ -66,7 +72,8 @@ impl BlockChain {
      * Makes sure given utxos exist and unspent
      */
     pub fn ensure_utxos_unspent(&self, utxos: &Vec<UnspentOutput>) -> Result<()> {
-        let input_utxos: HashSet<String> = HashSet::from_iter(utxos.iter().map(|utxo| utxo.hash_str()));
+        let input_utxos: HashSet<String> =
+            HashSet::from_iter(utxos.iter().map(|utxo| utxo.hash_str()));
         let mut remaining_utxos = HashSet::<String>::from_iter(input_utxos.clone());
 
         // check if at least one utxo has been spent
@@ -88,9 +95,12 @@ impl BlockChain {
         }
 
         if !remaining_utxos.is_empty() {
-            return Err(anyhow!("Utxos not found: {}", Vec::from_iter(remaining_utxos.clone()).join(", ")));
+            return Err(anyhow!(
+                "Utxos not found: {}",
+                Vec::from_iter(remaining_utxos.clone()).join(", ")
+            ));
         }
-        
+
         Ok(())
     }
 
@@ -102,7 +112,10 @@ impl BlockChain {
         let mut last_block_hash = Box::new(self.initial_utxo.hash());
         for (idx, block) in self.blocks.iter().enumerate() {
             if !block.verify_block(&last_block_hash)? {
-                return Err(anyhow::anyhow!("Blockchain corrupted at index {}. Verification failed", idx));
+                return Err(anyhow::anyhow!(
+                    "Blockchain corrupted at index {}. Verification failed",
+                    idx
+                ));
             } else {
                 let block_hash = hex::decode(&block.hash)?;
                 last_block_hash = Box::new(block_hash.clone());
@@ -118,7 +131,7 @@ impl BlockChain {
             if block.hash == hash {
                 return idx;
             }
-            idx +=1;
+            idx += 1;
         }
         -1
     }

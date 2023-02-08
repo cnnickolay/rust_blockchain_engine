@@ -1,9 +1,12 @@
 use std::collections::HashSet;
 
 use crate::model::PublicKeyStr;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
-use super::{blockchain::BlockChain, utxo::UnspentOutput, balanced_transaction::BalancedTransaction, transaction_id::TransactionId};
+use super::{
+    balanced_transaction::BalancedTransaction, blockchain::BlockChain,
+    transaction_id::TransactionId, utxo::UnspentOutput,
+};
 
 pub struct Transaction {
     pub from: PublicKeyStr,
@@ -13,7 +16,11 @@ pub struct Transaction {
 
 impl Transaction {
     pub fn new(from: &PublicKeyStr, to: &PublicKeyStr, amount: u64) -> Transaction {
-        Transaction { from: from.clone(), to: to.clone(), amount }
+        Transaction {
+            from: from.clone(),
+            to: to.clone(),
+            amount,
+        }
     }
 
     pub fn balance_transaction(&self, blockchain: &BlockChain) -> Result<BalancedTransaction> {
@@ -67,5 +74,4 @@ impl Transaction {
             outputs: output_utxos,
         })
     }
-
 }

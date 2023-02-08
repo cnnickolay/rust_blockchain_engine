@@ -1,9 +1,9 @@
-use serde::{Serialize, Deserialize};
+use crate::model::PublicKeyStr;
+use serde::{Deserialize, Serialize};
 use sha1::Digest;
 use sha2::Sha256;
-use crate::model::PublicKeyStr;
 
-use super::{uuid::Uuid, cbor::Cbor};
+use super::{cbor::Cbor, uuid::Uuid, blockchain::BlockChain};
 
 #[derive(Clone, Eq, Hash, PartialEq, Debug, Serialize, Deserialize)]
 pub struct UnspentOutput {
@@ -16,6 +16,10 @@ pub struct UnspentOutput {
 pub struct UnspentOutputId(pub String);
 
 impl UnspentOutput {
+    pub fn to_blockchain(self) -> BlockChain {
+        BlockChain::new(self)
+    }
+
     pub fn initial_utxo(address: &PublicKeyStr, amount: u64) -> Self {
         UnspentOutput {
             id: UnspentOutputId("0".to_owned()),
@@ -35,7 +39,7 @@ impl UnspentOutput {
     pub fn hash(&self) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update(&self.id.0.as_bytes());
-        hasher.update(&self.address.0.0.as_bytes());
+        hasher.update(&self.address.0 .0.as_bytes());
         hasher.update(&self.amount.to_le_bytes());
         hasher.finalize().to_vec()
     }

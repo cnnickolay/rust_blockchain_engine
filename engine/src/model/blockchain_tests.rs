@@ -5,8 +5,8 @@ mod tests {
     use sha2::Sha256;
 
     use crate::encryption::generate_rsa_key_pair;
-    use crate::model::HexString;
     use crate::model::signature::Signature;
+    use crate::model::HexString;
 
     #[test]
     fn signing_test_success() -> Result<()> {
@@ -30,5 +30,4 @@ mod tests {
             Err(_) => Ok(()),
         }
     }
-
 }

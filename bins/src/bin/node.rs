@@ -1,14 +1,21 @@
-use engine::run_node;
 use clap::Parser;
+use engine::run_node;
 use log::error;
-
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
     let args = Args::parse();
 
-    if let Err(err) = run_node(args.host, args.port, args.remote_validator.as_deref(), &args.private_key, &args.public_key).await {
+    if let Err(err) = run_node(
+        args.host,
+        args.port,
+        args.remote_validator.as_deref(),
+        &args.private_key,
+        &args.public_key,
+    )
+    .await
+    {
         error!("Error happened: {}", err)
     }
 
@@ -31,5 +38,5 @@ struct Args {
     private_key: String,
 
     #[arg(long)]
-    public_key: String
+    public_key: String,
 }

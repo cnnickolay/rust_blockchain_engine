@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /**
  * This request is sent from one validator to another to show that it admits the right
@@ -15,5 +15,5 @@ pub struct Vote {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VoteReply {
-    pub block: String // cbor of the block that will be added to the blockchain
+    pub block: String, // cbor of the block that will be added to the blockchain
 }

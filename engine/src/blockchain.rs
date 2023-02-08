@@ -1,11 +1,11 @@
+pub mod balanced_transaction;
+pub mod block;
 pub mod blockchain;
+pub mod cbor;
 pub mod signed_balanced_transaction;
+pub mod transaction;
+mod transaction_id;
+mod transaction_test;
 pub mod utxo;
 pub mod uuid;
-mod transaction_test;
-pub mod transaction;
-pub mod balanced_transaction;
-mod transaction_id;
-pub mod cbor;
-pub mod block;
 pub mod validator_signature;
